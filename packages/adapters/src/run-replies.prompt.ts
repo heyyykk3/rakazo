@@ -67,14 +67,18 @@ export function runReplyMode(
     isConversationalRun(trigger) &&
     trigger !== "bot_message" &&
     trigger !== BACKGROUND_HELPER_TRIGGER &&
-    !runAllowsSilentEmpty(trigger) &&
+    // A quiet helper wake keeps the bot's reply mode; it only gains the option of silence.
+    (!runAllowsSilentEmpty(trigger) || quietWake(trigger)) &&
     !disabled?.has("message_user")
     ? "messages"
     : "chat";
 }
 
 export function runReplyGuidance(trigger: string, replyMode: ReplyMode = "chat"): string {
-  if (replyMode === "messages") return messagesModeReplyGuidance();
+  if (replyMode === "messages")
+    return quietWake(trigger)
+      ? `${messagesModeReplyGuidance()} ${HELPER_RESULT_QUIET_REPLY_GUIDANCE}`
+      : messagesModeReplyGuidance();
   if (trigger === "reaction") return REACTION_SILENT_REPLY_GUIDANCE;
   if (isBackgroundRunTrigger(trigger)) return TICKET_SILENT_REPLY_GUIDANCE;
   if (quietWake(trigger)) return HELPER_RESULT_QUIET_REPLY_GUIDANCE;
