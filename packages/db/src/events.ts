@@ -19,7 +19,7 @@ import {
   splitToolHistory,
 } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
-import { cancelRunsInTransaction } from "./cancel-runs.js";
+import { cancelRunsInTransaction, conversationRunsWhere } from "./cancel-runs.js";
 import { createChatAlerts } from "./chat-alerts.js";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
@@ -46,6 +46,7 @@ import {
   partialReplyClientNonce,
   RunHistoryWriteError,
 } from "./messages.js";
+import { followOrganizationChanges, publishOrganizationChange } from "./organization-changes.js";
 import { isRecordNotFound } from "./prisma-errors.js";
 import type { RosterChange } from "./roster-changes.js";
 import { followRosterChanges, loadRosterScope, publishRosterChange } from "./roster-changes.js";
@@ -117,6 +118,11 @@ export interface ThreadEvents {
   followRosterChanges?(userId: string, signal?: AbortSignal): AsyncGenerator<void>;
   publishSpaceChange?(spaceId: string, kind: SpaceChangeKind): Promise<void>;
   followSpaceChanges?(spaceId: string, signal?: AbortSignal): AsyncGenerator<SpaceChangeKind>;
+  publishOrganizationChange?(
+    organizationId: string,
+    alsoUserIds?: readonly string[],
+  ): Promise<void>;
+  followOrganizationChanges?(userId: string, signal?: AbortSignal): AsyncGenerator<void>;
   answerRunInput(input: AnswerRunInput): Promise<boolean>;
   append(input: AppendEventInput): Promise<ProductEvent>;
   claimSteering(input: ClaimSteeringInput): Promise<ClaimedSteeringMessage[]>;
@@ -251,8 +257,12 @@ export function createThreadEvents(
       followRosterChanges: (userId, signal) =>
         followRosterChanges(realtime, userId, () => loadRosterScope(prisma, userId), signal),
       followSpaceChanges: (spaceId, signal) => followSpaceChanges(realtime, spaceId, signal),
+      followOrganizationChanges: (userId, signal) =>
+        followOrganizationChanges(realtime, userId, signal),
     }),
     publishSpaceChange: (spaceId, kind) => publishSpaceChange(realtime, spaceId, kind),
+    publishOrganizationChange: (organizationId, alsoUserIds) =>
+      publishOrganizationChange(prisma, realtime, organizationId, alsoUserIds),
     answerRunInput: (input) => answerRunInput(prisma, input, realtime, options.runSecretWriter),
     append: (input) => appendEvent(prisma, input, realtime, options.analytics),
     claimSteering: (input) => claimSteering(prisma, input),
@@ -298,15 +308,7 @@ export async function clearThread(
     const activeRuns = await tx.run.findMany({
       where: {
         spaceId: input.spaceId,
-        ...(input.groupId
-          ? { threadId: input.threadId }
-          : {
-              OR: [
-                { threadId: input.threadId, botId: input.botId },
-                // Background helpers this chat started work in threads of their own.
-                { trigger: BACKGROUND_HELPER_TRIGGER, sourceMessage: { threadId: input.threadId } },
-              ],
-            }),
+        ...conversationRunsWhere(input.threadId),
         status: { in: ["queued", "leased", "running", "waiting_input", "waiting_takeover"] },
       },
       select: { id: true, taskId: true, userId: true, spaceId: true },
@@ -315,12 +317,26 @@ export async function clearThread(
     const runIds = (await cancelRunsInTransaction(tx, activeRuns, now)).map((run) => run.id);
     // Expire as tombstones so a still-open provider screen claim cannot reset fencing to 1.
     await expireComputerExecutionLeases(tx, { runId: { in: runIds } });
-    // Helpers start only from the bot's own chat, so every thread the bot's helpers wrote goes
-    // with it, including imported ones that have no runs.
-    const helperThreads = { spaceId: input.spaceId, helperBotId: input.botId };
-    const cleared = input.groupId
-      ? { threadId: input.threadId }
-      : { OR: [{ threadId: input.threadId }, { thread: helperThreads }] };
+    // Capture hidden histories before deleting their source cards; other chats keep theirs.
+    const helperThreads = await tx.thread.findMany({
+      where: {
+        spaceId: input.spaceId,
+        OR: [
+          {
+            runs: {
+              some: {
+                trigger: BACKGROUND_HELPER_TRIGGER,
+                sourceMessage: { threadId: input.threadId },
+              },
+            },
+          },
+          ...(!input.groupId ? [{ helperBotId: input.botId, runs: { none: {} } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    const helperThreadIds = helperThreads.map((thread) => thread.id);
+    const cleared = { OR: [{ threadId: input.threadId }, { threadId: { in: helperThreadIds } }] };
     // A reply's kept screenshots belong to its messages, so they go with them.
     const clearedRuns = await tx.message.findMany({
       where: { ...cleared, runId: { not: null } },
@@ -339,12 +355,10 @@ export async function clearThread(
       await tx.artifact.deleteMany({ where: { id: { in: screenshots.map((row) => row.id) } } });
     await tx.message.deleteMany({ where: cleared });
     await tx.event.deleteMany({ where: cleared });
-    if (!input.groupId) {
-      await tx.thread.updateMany({
-        where: { ...helperThreads, historyCompactionSummary: { not: null } },
-        data: { historyCompactionSummary: null, historyCompactionGeneration: { increment: 1 } },
-      });
-    }
+    await tx.thread.updateMany({
+      where: { id: { in: helperThreadIds }, historyCompactionSummary: { not: null } },
+      data: { historyCompactionSummary: null, historyCompactionGeneration: { increment: 1 } },
+    });
     if (thread.nextMessageSeq > 0) {
       // nextMessageSeq is not reset, so mark every deleted message as already compacted.
       // Leaving the cursor behind would let compaction re-summarize deleted history (or, reset
@@ -392,26 +406,6 @@ export async function clearThread(
     await publishSpaceChange(realtime, input.spaceId, "runs");
   if (!input.groupId && committed.userId)
     await realtime?.publish(`incoming-calls:${committed.userId}`, "").catch(() => undefined);
-  // Legacy execution bindings point at runs of pre-lease releases, which kept writing
-  // Computer.executionRunId. Clearing them inside the transaction reaches for the
-  // computer row while holding the thread row. This statement holds no other row, so it can
-  // wait out any holder.
-  // The clear is already committed: a failed sweep leaves a stale binding for the idle pass
-  // to clear, and must not report the clear itself as failed.
-  if (committed.cancelledRunIds.length > 0) {
-    await withTransactionRetry(() =>
-      prisma.computer.updateMany({
-        where: { executionRunId: { in: committed.cancelledRunIds } },
-        data: {
-          executionRunId: null,
-          executionBotId: null,
-          executionLeaseExpiresAt: null,
-        },
-      }),
-    ).catch((error: unknown) => {
-      getLogger().error("legacy computer binding sweep after thread clear", error);
-    });
-  }
   return {
     event: mapProductEvent(committed.event),
     cancelledRunIds: committed.cancelledRunIds,

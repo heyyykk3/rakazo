@@ -34,7 +34,7 @@ import {
   ACTIVE_RUN_STATUSES,
   buildPlaybookFromRecording,
   ClientError,
-  COMPUTER_USING_RUNS,
+  computerUsingRuns,
   formatSkillRunPrompt,
   teachRecordingTtlMs,
 } from "@rakazo/core";
@@ -105,7 +105,7 @@ async function cancelActiveRuns(
       botId,
       userId: actor.userId,
       status: { in: [...ACTIVE_RUN_STATUSES] },
-      ...COMPUTER_USING_RUNS,
+      ...computerUsingRuns(),
     },
     data: { status: "cancelled", completedAt: new Date() },
     select: { id: true },
@@ -113,10 +113,6 @@ async function cancelActiveRuns(
   const runIds = activeRuns.map((run) => run.id);
   await clearEndedRunState(deps.prisma, runIds);
   await expireComputerExecutionLeases(deps.prisma, { botId, runId: { in: runIds } });
-  await deps.prisma.computer.updateMany({
-    where: { executionBotId: botId, executionRunId: { in: runIds } },
-    data: { executionRunId: null, executionBotId: null, executionLeaseExpiresAt: null },
-  });
   await deps.prisma.event.deleteMany({
     where: { type: "thread.progress", runId: { in: runIds } },
   });
@@ -189,7 +185,7 @@ async function assertComputerFreeFor(
   const othersWork = await deps.prisma.run.findFirst({
     where: {
       status: { in: [...ACTIVE_RUN_STATUSES] },
-      ...COMPUTER_USING_RUNS,
+      ...computerUsingRuns(),
       userId: { not: actor.userId },
       ...(bot.computerId ? { bot: { computerId: bot.computerId } } : { botId: bot.id }),
     },

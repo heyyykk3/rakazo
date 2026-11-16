@@ -87,11 +87,11 @@ export function runScriptAgentTool(
         return errorResult(`Script not run: ${messageOf(error)}`);
       }
       // Script calls get their own namespace so their execution ids never collide with the
-      // main agent's, and depth 1 so they do not write turn checkpoints.
+      // main agent's, and do not write turn checkpoints.
       const scriptHost: ToolHost = {
         ...host,
         providerToolCallIds: new Map(),
-        depth: Math.max(1, host.depth + 1),
+        captureCheckpoint: undefined,
         agentNamespace: `${host.agentNamespace ?? "main"}/script/${toolCallId}`,
         pendingShells: [],
         abortTurn: () => host.abortTurn(),

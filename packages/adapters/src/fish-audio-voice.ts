@@ -10,7 +10,7 @@ import type {
   VoiceVerifyResult,
 } from "@rakazo/adapter-kit";
 import { VoiceAccountError } from "@rakazo/adapter-kit";
-import { deadlineSignal } from "@rakazo/core";
+import { deadlineSignal, ResponseTooLargeError } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
 import {
   isSpeechModelId,
@@ -21,6 +21,7 @@ import {
   voiceLanguageHint,
   voiceRequestError,
 } from "./voice-http.js";
+import type { VoiceProviderDefinition } from "./voice-provider-descriptor.js";
 
 const API = "https://api.fish.audio";
 const MODEL_PAGE_SIZE = 100;
@@ -287,7 +288,7 @@ async function readFishResponse(res: Response): Promise<unknown> {
 }
 
 function fishUnreadBody(error: unknown): { message: string } {
-  if (error instanceof Error && error.message === "Voice response is too large.") {
+  if (error instanceof ResponseTooLargeError) {
     return { message: error.message };
   }
   return { message: "response body could not be read" };
@@ -388,3 +389,14 @@ function languageLabel(value: unknown): string {
     .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     .join(", ");
 }
+
+export const fishAudioVoice: VoiceProviderDefinition = {
+  catalog: {
+    name: "Fish Audio",
+    description: "Voice models, cloning, and expressive speech with optional transcription.",
+    transcribe: true,
+    speechModel: true,
+    languages: true,
+  },
+  create: () => new FishAudioVoiceProvider(),
+};
