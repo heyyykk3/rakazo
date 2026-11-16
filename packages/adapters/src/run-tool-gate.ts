@@ -50,7 +50,14 @@ import {
 import { reviewWithBackups } from "./auto-review-backups.js";
 import { RAKAZO_DOCS_URLS } from "./builtin-skills.prompt.js";
 import type { ExecutorDeps } from "./executor-deps.js";
-import { grokbotDeniedInEarlierRun, grokbotOutboundAction } from "./grokbot-gates.js";
+import { grokbotApprovalQuestion } from "./grokbot-approval-labels.js";
+import { grokbotEnabled } from "./grokbot-flags.js";
+import {
+  grokbotCardAlreadyWaiting,
+  grokbotDeniedInEarlierRun,
+  grokbotOutboundAction,
+  grokbotWaryAfterDenial,
+} from "./grokbot-gates.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
 import { paidRequestEffect } from "./paid-request.js";
@@ -296,20 +303,35 @@ export async function gateToolCall(
       ));
   // A gated read still fails closed when its review errors, and keeps its approval key.
   const gated = requiresApprovalByDefault || connectorReadGated;
+  // Fork: a routine the owner asked for in their own message is judged against their words by
+  // the approval model instead of always asking. Other runs keep upstream's rule.
+  const ownerAskedRoutine =
+    scheduleNamesNewSite && grokbotEnabled("gates") && ctx.source.ownerStartedRun;
   // These ask in every run, whatever started it.
   const mandatoryInAnyRun =
-    paying || unattendedWatch || scheduleNamesNewSite || toolRequiresExplicitApproval(name);
+    paying ||
+    unattendedWatch ||
+    (scheduleNamesNewSite && !ownerAskedRoutine) ||
+    toolRequiresExplicitApproval(name);
   // Fork: sending, posting, deleting and spending ask in every mode, Never ask included.
-  const outboundAction = grokbotOutboundAction({
+  // So does anything that acts, for a while after the person said no in this chat.
+  const gateInput = {
     name,
     viaConnector,
     actionNames: approvalToolNames,
     readOnlyFor: declaredReadOnlyFor,
-  });
+  };
+  const outboundAction =
+    grokbotOutboundAction(gateInput) ||
+    (await grokbotWaryAfterDenial(deps.prisma, ctx.state, {
+      ...gateInput,
+      threadId: ctx.thread.id,
+    }));
   // No allow rule skips these, and without them the tool needs no approval, so "Always allow"
   // on their card would save a rule that never takes effect.
   const asksEveryTime =
-    (unattendedWatch || scheduleNamesNewSite) && !toolRequiresApproval(name, viaConnector);
+    (unattendedWatch || (scheduleNamesNewSite && !ownerAskedRoutine)) &&
+    !toolRequiresApproval(name, viaConnector);
   // Never ask runs everything else: only another owner's connection could have been steered into it.
   const guardedInNeverAsk = name === "respond_agent_connection";
   const resolvedRules = resolveActionApprovalForTools({
@@ -377,6 +399,8 @@ export async function gateToolCall(
         reviewOnly: connectorReadGated,
         checkerConfigured,
         newDestination: siteGate === "new",
+        // An owner-asked routine naming a new site is judged like a new destination.
+        ...(ownerAskedRoutine ? { newDestination: true } : {}),
         purchase: paying || outboundAction,
       });
   // Nobody is there to approve a purchase, or a sign-in that asks first, a webhook run reaches.
@@ -579,6 +603,27 @@ export async function gateToolCall(
   }
 
   const needsApproval = gateDecision === "ask";
+  // Fork: the person is already looking at a card for this kind of action in this chat.
+  if (
+    needsApproval &&
+    applied &&
+    (await grokbotCardAlreadyWaiting(deps.prisma, {
+      runId,
+      threadId: ctx.thread.id,
+      kind: replayEffectToolName,
+    }))
+  ) {
+    await deps.prisma.externalEffect.updateMany({
+      where: { id: applied.effect.id, status: "intended" },
+      data: { status: "denied", result: { refused: "card_already_waiting" } },
+    });
+    return {
+      result: refusal(
+        "approval_already_waiting",
+        "The person already has an approval card waiting in this chat for this kind of action. Don't ask again; tell them it's waiting for their answer.",
+      ),
+    };
+  }
   // Nobody sees a background helper's thread, so a card there would wait forever.
   if (needsApproval && run.trigger === BACKGROUND_HELPER_TRIGGER) {
     if (applied) {
@@ -842,7 +887,7 @@ async function showApprovalCard(ctx: RunContext, call: ToolCall, card: ApprovalC
   await notifyRun(deps, run, {
     kind: "help",
     title: `${displayName(bot.name, "Bot")} needs approval`,
-    body: `Review before ${name}`,
+    body: grokbotApprovalQuestion(name, args, undefined) ?? `Review before ${name}`,
     botId: bot.id,
     threadId: thread.id,
   });

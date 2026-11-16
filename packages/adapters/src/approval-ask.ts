@@ -12,6 +12,7 @@ import {
   toolRequiresExplicitApproval,
 } from "@rakazo/core";
 import { urlSite } from "@rakazo/core/egress";
+import { grokbotApprovalQuestion } from "./grokbot-approval-labels.js";
 import { USER_COMPUTER_SCREEN_TOOLS, userComputerAppName } from "./user-computer-tools.js";
 
 export const MAX_APPROVAL_SUMMARY_LENGTH = 500;
@@ -183,6 +184,9 @@ export function buildApprovalAskBlock(
   }
   const fetchSite = webFetchSite(toolName, args);
   const summary = describeApprovalAction(toolName, args, options?.batch);
+  const plainQuestion = options?.batch
+    ? undefined
+    : grokbotApprovalQuestion(toolName, args, fetchSite ?? undefined);
   const detail = formatApprovalDetail(
     toolName,
     args,
@@ -196,7 +200,7 @@ export function buildApprovalAskBlock(
     approvalEffectId: effectId,
     text: truncate(
       redactSecrets(
-        toolName === "create_space" ? `${summary}?` : `Review before ${summary}`,
+        toolName === "create_space" ? `${summary}?` : (plainQuestion ?? `Review before ${summary}`),
         secrets,
       ),
       MAX_APPROVAL_SUMMARY_LENGTH,

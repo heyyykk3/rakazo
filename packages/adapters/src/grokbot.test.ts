@@ -1,9 +1,15 @@
 import type { AdapterContext, MemoryCommitRequest, MemoryStore } from "@rakazo/adapter-kit";
 import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { grokbotApprovalQuestion } from "./grokbot-approval-labels.js";
 import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import { grokbotEnabled } from "./grokbot-flags.js";
-import { grokbotOutboundAction, stableJson } from "./grokbot-gates.js";
+import {
+  grokbotCardAlreadyWaiting,
+  grokbotOutboundAction,
+  grokbotWaryAfterDenial,
+  stableJson,
+} from "./grokbot-gates.js";
 import { GrokbotJournalMemory, similarity } from "./grokbot-journal-memory.js";
 
 const context = { spaceId: "s1", userId: "u1", operationId: "o", traceId: "t" } as AdapterContext;
@@ -207,5 +213,85 @@ describe("outbound gates", () => {
 
   it("compare arguments regardless of key order", () => {
     expect(stableJson({ b: 1, a: { d: 2, c: 3 } })).toBe(stableJson({ a: { c: 3, d: 2 }, b: 1 }));
+  });
+
+  it("ask before trials, sign-ups and subscriptions", () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "gates");
+    const check = (name: string) =>
+      grokbotOutboundAction({
+        name,
+        viaConnector: true,
+        actionNames: [name],
+        readOnlyFor: () => undefined,
+      });
+    expect(check("STRIPE_START_TRIAL")).toBe(true);
+    expect(check("MAILCHIMP_SUBSCRIBE_MEMBER")).toBe(true);
+    expect(check("NOTION_GET_PAGE")).toBe(false);
+  });
+
+  it("make acting tools ask after a recent no, but leave reading alone", async () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "gates");
+    const findFirst = vi.fn(async () => ({ id: "e1" }));
+    const prisma = { externalEffect: { findFirst } } as never;
+    const input = (name: string, viaConnector = false) => ({
+      threadId: "t1",
+      name,
+      viaConnector,
+      actionNames: [name],
+      readOnlyFor: (tool: string) => (tool === "GMAIL_LIST_MESSAGES" ? true : undefined),
+    });
+    const state = {};
+    expect(await grokbotWaryAfterDenial(prisma, state, input("shell"))).toBe(true);
+    expect(await grokbotWaryAfterDenial(prisma, state, input("web_search"))).toBe(false);
+    expect(await grokbotWaryAfterDenial(prisma, state, input("GMAIL_LIST_MESSAGES", true))).toBe(
+      false,
+    );
+    expect(await grokbotWaryAfterDenial(prisma, state, input("REDDIT_VOTE", true))).toBe(true);
+    // One lookup per attempt.
+    expect(findFirst).toHaveBeenCalledTimes(1);
+    findFirst.mockResolvedValueOnce(null as never);
+    expect(await grokbotWaryAfterDenial(prisma, {}, input("shell"))).toBe(false);
+  });
+
+  it("notice a card already waiting in another run of the chat", async () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "gates");
+    const findFirst = vi.fn(async () => ({ id: "e2" }));
+    const prisma = { externalEffect: { findFirst } } as never;
+    expect(
+      await grokbotCardAlreadyWaiting(prisma, {
+        runId: "r2",
+        threadId: "t1",
+        kind: "schedule_create",
+      }),
+    ).toBe(true);
+    expect((findFirst.mock.calls[0] as unknown[])[0]).toMatchObject({
+      where: { kind: "schedule_create", status: { in: ["intended"] }, runId: { not: "r2" } },
+    });
+  });
+});
+
+describe("approval questions", () => {
+  it("name the action in plain words", () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "gates");
+    expect(
+      grokbotApprovalQuestion("schedule_create", { name: "Weekday HN top 3" }, undefined),
+    ).toBe("Create the routine “Weekday HN top 3”?");
+    expect(grokbotApprovalQuestion("send_email", { to: ["a@x.com", "b@y.com"] }, undefined)).toBe(
+      "Send an email to a@x.com, b@y.com?",
+    );
+    expect(grokbotApprovalQuestion("web_fetch", { url: "https://x.com" }, "x.com")).toBe(
+      "Open x.com?",
+    );
+    expect(grokbotApprovalQuestion("REDDIT_SUBMIT_POST", {}, undefined)).toBe(
+      "Reddit: submit post?",
+    );
+    expect(grokbotApprovalQuestion("update_preferences", {}, undefined)).toBe(
+      "Update preferences?",
+    );
+  });
+
+  it("keep upstream wording when off", () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "off");
+    expect(grokbotApprovalQuestion("schedule_create", { name: "x" }, undefined)).toBeUndefined();
   });
 });
