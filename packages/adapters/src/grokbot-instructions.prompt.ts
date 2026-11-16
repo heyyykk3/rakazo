@@ -1,5 +1,5 @@
-import { grokbotEnabled } from "./grokbot-flags.js";
 import { GROKBOT_FENCE_INSTRUCTION } from "./grokbot-fence.js";
+import { grokbotEnabled } from "./grokbot-flags.js";
 
 /**
  * Fork addition: the working style of a terse, dependable assistant. Added to every run's
@@ -10,7 +10,8 @@ export function grokbotInstructions(parts: {
   disabledBuiltinTools?: ReadonlySet<string>;
 }): string | undefined {
   const fence = grokbotEnabled("fence") ? GROKBOT_FENCE_INSTRUCTION : undefined;
-  const memory = grokbotEnabled("memory") && offeredTool(parts, "save_memory") ? MEMORY_RULES : undefined;
+  const memory =
+    grokbotEnabled("memory") && offeredTool(parts, "save_memory") ? MEMORY_RULES : undefined;
   if (!grokbotEnabled("prompt")) return [fence, memory].filter(Boolean).join("\n\n") || undefined;
   const offered = (tool: string) => !parts.disabledBuiltinTools?.has(tool);
   const rules = [
@@ -46,7 +47,7 @@ function offeredTool(parts: { disabledBuiltinTools?: ReadonlySet<string> }, tool
 const MEMORY_RULES = [
   "Memory:",
   "- Your profile (remember) and the shared profile are always in view. Dated journal entries are not: you see recent ones and ones that match the request, and recall_memory searches the rest by keyword and meaning.",
-  "- Save lasting facts quietly with save_memory, without announcing it: one self-contained sentence per fact that still makes sense months from now. Start it with \"shared:\" when every bot should know it, such as a fact about the person; otherwise it goes to your own journal.",
+  '- Save lasting facts quietly with save_memory, without announcing it: one self-contained sentence per fact that still makes sense months from now. Start it with "shared:" when every bot should know it, such as a fact about the person; otherwise it goes to your own journal.',
   "- When entries disagree, your own memory wins for how you do your job, and the newest entry wins for facts about the person.",
   "- Forget with forget_memory, passing the entry id or its exact text. Never save passwords, keys or codes; those belong in the vault.",
 ].join("\n");

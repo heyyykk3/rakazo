@@ -50,9 +50,9 @@ import {
 import { reviewWithBackups } from "./auto-review-backups.js";
 import { RAKAZO_DOCS_URLS } from "./builtin-skills.prompt.js";
 import type { ExecutorDeps } from "./executor-deps.js";
+import { grokbotDeniedInEarlierRun, grokbotOutboundAction } from "./grokbot-gates.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
-import { grokbotDeniedInEarlierRun, grokbotOutboundAction } from "./grokbot-gates.js";
 import { paidRequestEffect } from "./paid-request.js";
 import type { PurchaseApproval } from "./purchase-gate.js";
 import { PURCHASE_CHECKED_TOOLS, purchaseApprovalOf } from "./purchase-gate.js";

@@ -5,6 +5,7 @@ import { withAutomatedLabels } from "./automated-messages.js";
 import { helperResultLabel } from "./background-helpers.prompt.js";
 import { DELEGATION_TOOL_NAMES } from "./builtin.tool-definition.js";
 import { withCloudflareAuth } from "./cloudflare-ai-gateway.js";
+import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import { estimatePiImageTokens } from "./pi-image-context.js";
 import { COMPUTER_MODE_TOOLS } from "./pi-runtime-computer-mode.js";
 import {
@@ -25,7 +26,6 @@ import {
 } from "./pi-runtime-models.js";
 import { conversationSessionId, reliableModelStream } from "./pi-runtime-stream.js";
 import type { ToolHost } from "./pi-runtime-tools.js";
-import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import { toAgentTools, toolCallBudgetExceededMessage } from "./pi-runtime-tools.js";
 import { observedPiStream } from "./pi-usage.js";
 import { subagentSystemPrompt } from "./runtime.prompt.js";

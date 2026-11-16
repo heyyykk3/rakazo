@@ -1,5 +1,4 @@
 export * from "./advisory-lock.js";
-export * from "./grokbot-flags.js";
 export * from "./agent-connections.js";
 export * from "./agent-environment.js";
 export { formatAgentEnvironmentInstruction } from "./agent-environment.prompt.js";
@@ -124,6 +123,7 @@ export * from "./fish-audio-voice.js";
 export * from "./fleet-tools.js";
 export * from "./github-webhook-emulator.js";
 export * from "./graphql-connectors.js";
+export * from "./grokbot-flags.js";
 export * from "./group-handoff.js";
 export { HindsightMemoryProvider } from "./hindsight-memory-provider.js";
 export * from "./home.js";

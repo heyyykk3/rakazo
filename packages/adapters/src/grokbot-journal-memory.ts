@@ -267,7 +267,10 @@ function cleanName(name: string): string {
 }
 
 export function normalizeFact(text: string): string {
-  const flat = text.replace(/\s+/g, " ").trim().replace(/^[-*]\s+/, "");
+  const flat = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[-*]\s+/, "");
   return flat.length > MAX_FACT_CHARS ? `${flat.slice(0, MAX_FACT_CHARS - 3)}...` : flat;
 }
 
@@ -278,7 +281,9 @@ export function normalizeFact(text: string): string {
 function resolveConflicts(entries: Entry[]): Entry[] {
   const kept: Entry[] = [];
   for (const entry of entries) {
-    const clash = kept.findIndex((other) => similarity(other.fact, entry.fact) >= SUPERSEDE_SIMILARITY);
+    const clash = kept.findIndex(
+      (other) => similarity(other.fact, entry.fact) >= SUPERSEDE_SIMILARITY,
+    );
     if (clash === -1) {
       kept.push(entry);
       continue;

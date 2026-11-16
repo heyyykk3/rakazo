@@ -39,6 +39,7 @@ import {
   SILENT_ALLOWED_TOOL_CONTINUATION_PROMPT,
   SILENT_TOOL_CONTINUATION_PROMPT,
 } from "./continuation.prompt.js";
+import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import { neutralizeSpeakerLabels } from "./history-speakers.js";
 import { estimatePiImageTokens } from "./pi-image-context.js";
 import {
@@ -85,7 +86,6 @@ import {
 import { conversationSessionId, reliableModelStream } from "./pi-runtime-stream.js";
 import { MAX_PARALLEL_SUBAGENTS } from "./pi-runtime-subagent.js";
 import type { ToolCallBudget, ToolHost } from "./pi-runtime-tools.js";
-import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import {
   agentToolDefinitions,
   createGate,
