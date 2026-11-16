@@ -313,8 +313,9 @@ export async function gateToolCall(
     unattendedWatch ||
     (scheduleNamesNewSite && !ownerAskedRoutine) ||
     toolRequiresExplicitApproval(name);
-  // Fork: sending, posting, deleting and spending ask in every mode, Never ask included.
-  // So does anything that acts, for a while after the person said no in this chat.
+  // Fork: sending, posting, deleting and spending count as consequential, and so does anything
+  // that acts for a while after the person said no in this chat. They follow the person's
+  // approval mode: Ask asks, Auto has the approval model judge them, Never ask runs them.
   const gateInput = {
     name,
     viaConnector,
@@ -395,13 +396,13 @@ export async function gateToolCall(
           guardedInNeverAsk && mode === "never"
             ? !ctx.source.ownerStartedRun || (await isRunTainted(ctx))
             : undefined,
-        consequential: requiresApprovalByDefault,
+        consequential: requiresApprovalByDefault || outboundAction,
         reviewOnly: connectorReadGated,
         checkerConfigured,
         newDestination: siteGate === "new",
         // An owner-asked routine naming a new site is judged like a new destination.
         ...(ownerAskedRoutine ? { newDestination: true } : {}),
-        purchase: paying || outboundAction,
+        purchase: paying,
       });
   // Nobody is there to approve a purchase, or a sign-in that asks first, a webhook run reaches.
   if (paying && run.trigger === "webhook" && plan !== "deny") {
