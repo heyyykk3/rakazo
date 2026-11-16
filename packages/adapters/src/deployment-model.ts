@@ -46,6 +46,7 @@ export function resolveDeploymentModel(env: NodeJS.ProcessEnv = process.env) {
     openrouter: env.OPENROUTER_API_KEY,
     anthropic: env.ANTHROPIC_API_KEY,
     deepseek: env.DEEPSEEK_API_KEY,
+    azure: env.AZURE_OPENAI_API_KEY,
   };
   const models: Record<string, string> = {
     openrouter: DEFAULT_OPENROUTER_MODEL_ID,
