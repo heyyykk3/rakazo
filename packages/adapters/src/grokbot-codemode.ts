@@ -1,8 +1,8 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { validateToolArguments } from "@earendil-works/pi-ai";
+import type { CodemodeTool } from "@earendil-works/pi-codemode";
 import {
   CodemodeSandbox,
-  type CodemodeTool,
   parseCodemodeSource,
   renderDeclarations,
 } from "@earendil-works/pi-codemode";
@@ -66,7 +66,7 @@ export function runScriptAgentTool(
       "The code is the body of an async function: use await, Promise.all and return. Call tools as await tools.<name>(args); each returns the tool's result, parsed from JSON when possible.",
       "Use text(value) to add output lines. Only the output and the return value come back to you, so filter and summarize inside the script.",
       "There is no fetch, timers, require or file system; only the tools below. Sending, posting, writing and anything that needs approval stays a direct tool call.",
-      "An optional first line // @options: {\"timeout_ms\": 60000} sets the deadline (max 300000).",
+      'An optional first line // @options: {"timeout_ms": 60000} sets the deadline (max 300000).',
       "",
       declarations,
     ].join("\n"),
