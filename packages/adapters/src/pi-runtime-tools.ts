@@ -28,6 +28,7 @@ import {
 import { FIND_TOOL, USE_TOOL } from "./builtin.tool-definition.js";
 import { findTools, partitionTools } from "./builtin-tool-bridge.js";
 import { shortenToolResultText } from "./context-selection.js";
+import { RUN_SCRIPT_TOOL, runScriptAgentTool } from "./grokbot-codemode.js";
 import type { PiAgentRuntimeOptions } from "./pi-runtime.js";
 import { COMPUTER_MODE_TOOLS } from "./pi-runtime-computer-mode.js";
 import { sanitizeSensitiveText } from "./pi-runtime-errors.js";
@@ -77,6 +78,12 @@ export function toAgentTools(toolDefs: readonly ConnectorTool[], host: ToolHost)
   const tools = namedAgentTools(listed).map(({ tool, name }) =>
     toAgentTool(tool, host, name, { deferred }),
   );
+  const script = tools.some((tool) => tool.name === RUN_SCRIPT_TOOL)
+    ? undefined
+    : runScriptAgentTool(toolDefs, host, (tool, scriptHost, name) =>
+        toAgentTool(tool, scriptHost, name),
+      );
+  if (script) tools.push(script);
   if (!deferred.length) return tools;
   const runnable = new Map(
     [...tools, ...deferred.map((tool) => toAgentTool(tool, host, tool.name, { viaUseTool: true }))]

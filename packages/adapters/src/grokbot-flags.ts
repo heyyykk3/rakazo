@@ -9,7 +9,8 @@ export type GrokbotFeature =
   | "compaction"
   | "gates"
   | "fence"
-  | "memory";
+  | "memory"
+  | "codemode";
 
 export function grokbotEnabled(
   feature: GrokbotFeature,
