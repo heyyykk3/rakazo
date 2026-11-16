@@ -1,8 +1,10 @@
 import type { Api, Model, MutableModels } from "@earendil-works/pi-ai";
 import { canonicalPiProviderId } from "@rakazo/contracts";
+import { applyAnthropicBaseUrl } from "./grokbot-anthropic-base-url.js";
 
 /** Apply provider protocol capabilities before catalog and runtime selection. */
 export function applyPiModelCompatibility(models: MutableModels): MutableModels {
+  applyAnthropicBaseUrl(models);
   // Pi 1.5.x predates Hydrogen. Keep this override only until the bundled catalog catches up.
   // https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/4-hydrogen
   for (const id of ["google", "google-vertex"]) {
