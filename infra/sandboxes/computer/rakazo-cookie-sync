@@ -1,0 +1,222 @@
+#!/usr/bin/python3 -I
+"""Share sign-ins between the bots' browsers on this computer (fork addition).
+
+Each bot keeps its own browser profile and screen. While this runs, a cookie one browser gains
+or changes (a sign-in) is copied into every other running browser, and a cookie one browser
+loses (a sign-out) is removed from the others. A browser that starts later receives the shared
+sign-ins. The shared store lives in the computer's home, readable only by its user, like the
+profiles themselves.
+
+Enabled only when /etc/rakazo/shared-logins exists (image built with RAKAZO_SHARED_LOGINS=on).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import socket
+import sys
+import tempfile
+import time
+import urllib.request
+from typing import Any
+
+sys.path[:0] = [os.path.dirname(os.path.realpath(__file__)), "/usr/local/lib/rakazo"]
+
+FLAG = "/etc/rakazo/shared-logins"
+STORE = os.path.join(os.environ.get("HOME", "/home/rakazo"), ".browser-profiles", "shared-cookies.json")
+INTERVAL_S = 3.0
+FIRST_DEBUG_PORT = 9222
+# A sign-out spreads for this long; after that a browser that still has the cookie re-shares it.
+TOMBSTONE_S = 24 * 60 * 60
+# Fields Storage.setCookies accepts, taken from what Storage.getCookies returns.
+SETTABLE = ("name", "value", "domain", "path", "secure", "httpOnly", "sameSite", "expires",
+            "priority", "sourceScheme", "sourcePort", "partitionKey")
+
+Cookie = dict[str, Any]
+
+
+def cookie_key(cookie: Cookie) -> str:
+    return json.dumps([cookie.get("name"), cookie.get("domain"), cookie.get("path", "/"),
+                       cookie.get("partitionKey")], sort_keys=True)
+
+
+def fingerprint(cookie: Cookie) -> str:
+    return json.dumps([cookie.get("value"), cookie.get("expires"), cookie.get("secure"),
+                       cookie.get("httpOnly"), cookie.get("sameSite")], sort_keys=True)
+
+
+def expired(cookie: Cookie, now: float) -> bool:
+    expires = cookie.get("expires")
+    return (not cookie.get("session")) and isinstance(expires, (int, float)) and 0 < expires < now
+
+
+def settable(cookie: Cookie) -> Cookie:
+    out = {field: cookie[field] for field in SETTABLE if field in cookie and cookie[field] is not None}
+    # A session cookie has no expiry to set; a negative one would delete it.
+    if cookie.get("session") or (isinstance(out.get("expires"), (int, float)) and out["expires"] <= 0):
+        out.pop("expires", None)
+    return out
+
+
+def reconcile(store: dict[str, Any], seen: dict[str, str] | None, current: list[Cookie],
+              now: float) -> tuple[dict[str, str], bool]:
+    """Fold one browser's cookies into the shared store.
+
+    `seen` is what that browser held after the last sync (None for a browser not seen before).
+    Returns the browser's current fingerprints and whether the store changed. A browser seen for
+    the first time only adds cookies the store lacks, so a stale profile cannot undo a newer
+    sign-in elsewhere.
+    """
+    cookies: dict[str, Cookie] = store.setdefault("cookies", {})
+    tombstones: dict[str, float] = store.setdefault("tombstones", {})
+    live = {cookie_key(c): c for c in current if not expired(c, now)}
+    changed = False
+    for key, cookie in live.items():
+        fp = fingerprint(cookie)
+        if seen is None:
+            if key not in cookies and now - tombstones.get(key, 0) > TOMBSTONE_S:
+                cookies[key] = cookie
+                changed = True
+        elif seen.get(key) != fp:
+            cookies[key] = cookie
+            tombstones.pop(key, None)
+            changed = True
+    if seen is not None:
+        for key in seen.keys() - live.keys():
+            if key in cookies:
+                del cookies[key]
+                tombstones[key] = now
+                changed = True
+    for key in [k for k, c in cookies.items() if expired(c, now)]:
+        del cookies[key]
+        changed = True
+    for key in [k for k, t in tombstones.items() if now - t > TOMBSTONE_S]:
+        del tombstones[key]
+        changed = True
+    return {k: fingerprint(c) for k, c in live.items()}, changed
+
+
+def plan(store: dict[str, Any], current: list[Cookie]) -> tuple[list[Cookie], list[Cookie]]:
+    """The cookies to set in a browser, and the ones to remove, to match the store."""
+    cookies: dict[str, Cookie] = store.get("cookies", {})
+    tombstones: dict[str, float] = store.get("tombstones", {})
+    live = {cookie_key(c): c for c in current}
+    to_set = [settable(c) for key, c in cookies.items()
+              if key not in live or fingerprint(live[key]) != fingerprint(c)]
+    to_remove = [dict(settable(live[key]), value="", expires=1) for key in tombstones if key in live]
+    return to_set, to_remove
+
+
+def load_store() -> dict[str, Any]:
+    try:
+        with open(STORE, encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_store(store: dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(STORE), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(STORE), prefix=".shared-cookies-")
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(store, handle)
+        os.replace(tmp, STORE)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def debug_ports() -> list[int]:
+    """Loopback ports at or above the first browser debug port that are listening."""
+    ports: set[int] = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table, encoding="ascii") as handle:
+                next(handle, None)
+                for line in handle:
+                    fields = line.split()
+                    if len(fields) > 3 and fields[3] == "0A":
+                        port = int(fields[1].rsplit(":", 1)[1], 16)
+                        if port >= FIRST_DEBUG_PORT:
+                            ports.add(port)
+        except OSError:
+            continue
+    return sorted(ports)
+
+
+def browser_ws(port: int) -> str | None:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=0.5) as resp:
+            info = json.loads(resp.read(65536).decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+    ws = info.get("webSocketDebuggerUrl") if isinstance(info, dict) else None
+    return ws if isinstance(ws, str) and ws.startswith(f"ws://127.0.0.1:{port}/") else None
+
+
+def run() -> None:
+    from page_secrets import CdpClient
+
+    store = load_store()
+    clients: dict[int, Any] = {}
+    seen: dict[int, dict[str, str]] = {}
+    while True:
+        now = time.time()
+        changed = False
+        snapshots: dict[int, list[Cookie]] = {}
+        for port in debug_ports():
+            client = clients.get(port)
+            if client is None:
+                ws = browser_ws(port)
+                if not ws:
+                    continue
+                client = CdpClient(ws)
+                try:
+                    client.connect()
+                except (OSError, RuntimeError):
+                    continue
+                clients[port] = client
+                seen.pop(port, None)
+            try:
+                snapshots[port] = client.call("Storage.getCookies").get("cookies", [])
+            except (OSError, RuntimeError, ValueError):
+                client.close()
+                clients.pop(port, None)
+                seen.pop(port, None)
+        for port in list(clients):
+            if port not in snapshots:
+                clients.pop(port).close()
+                seen.pop(port, None)
+        for port, current in snapshots.items():
+            seen[port], did = reconcile(store, seen.get(port), current, now)
+            changed = changed or did
+        for port, current in snapshots.items():
+            to_set, to_remove = plan(store, current)
+            try:
+                if to_set or to_remove:
+                    clients[port].call("Storage.setCookies", {"cookies": to_set + to_remove})
+                    after = clients[port].call("Storage.getCookies").get("cookies", [])
+                    seen[port] = {cookie_key(c): fingerprint(c) for c in after if not expired(c, now)}
+            except (OSError, RuntimeError, ValueError):
+                clients.pop(port).close()
+                seen.pop(port, None)
+        if changed:
+            try:
+                save_store(store)
+            except OSError as error:
+                print(f"could not save shared cookies: {error}", file=sys.stderr)
+        time.sleep(INTERVAL_S)
+
+
+if __name__ == "__main__":
+    if not os.path.exists(FLAG):
+        sys.exit(0)
+    socket.setdefaulttimeout(10)
+    run()

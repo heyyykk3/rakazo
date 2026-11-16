@@ -10,6 +10,7 @@ services:
     build:
       args:
         BROWSER: ${RAKAZO_COMPUTER_BROWSER:-brave}
+        RAKAZO_SHARED_LOGINS: ${RAKAZO_SHARED_LOGINS:-on}
   api:
     environment: *grokbot-environment
   worker:

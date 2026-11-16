@@ -35,6 +35,14 @@ if [[ -n "${RAKAZO_COMPUTER_CONTROL_TOKEN:-}" ]]; then
   done >/tmp/rakazo/control.log 2>&1 &
 fi
 
+# Fork: one set of sign-ins for every bot's browser on this computer.
+if [[ -f /etc/rakazo/shared-logins ]]; then
+  while true; do
+    /usr/local/bin/rakazo-cookie-sync
+    sleep 2
+  done >/tmp/rakazo/cookie-sync.log 2>&1 &
+fi
+
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
 
 Xvfb :1 -screen 0 1280x800x24 -ac +extension RANDR +render -noreset >/tmp/rakazo/xvfb.log 2>&1 &

@@ -202,6 +202,8 @@ COPY --from=capture-builder /build/librakazo-xcapture.so /usr/local/lib/librakaz
 COPY --chmod=755 rakazo-browser /usr/local/bin/rakazo-browser
 COPY --chmod=755 rakazo-focus-or-launch /usr/local/bin/rakazo-focus-or-launch
 COPY --chmod=755 rakazo-page-browser /usr/local/bin/rakazo-page-browser
+# Fork: shares sign-ins between the bots' browsers when built with RAKAZO_SHARED_LOGINS=on.
+COPY --chmod=755 rakazo-cookie-sync /usr/local/bin/rakazo-cookie-sync
 COPY --chmod=644 page_secrets.py /usr/local/lib/rakazo/page_secrets.py
 COPY --chmod=644 rakazo-browser.desktop /usr/share/applications/rakazo-browser.desktop
 # Rakazo keeps credentials itself; the browser's save prompts would cover pages.
@@ -220,10 +222,12 @@ COPY --chmod=644 mobile-keyboard.js /usr/share/novnc/mobile-keyboard.js
 COPY --chmod=644 rakazo-local-bin.sh /etc/profile.d/rakazo-local-bin.sh
 # Strip CR so shebangs work even if the build context came from a CRLF checkout.
 RUN ldconfig \
-  && sed -i 's/\r$//' /usr/local/bin/rakazo-computer /usr/local/lib/rakazo-user-env.sh /usr/local/bin/rakazo-computer-control /usr/local/bin/rakazo-browser /usr/local/bin/rakazo-focus-or-launch /usr/local/bin/rakazo-page-browser \
+  && sed -i 's/\r$//' /usr/local/bin/rakazo-computer /usr/local/lib/rakazo-user-env.sh /usr/local/bin/rakazo-computer-control /usr/local/bin/rakazo-browser /usr/local/bin/rakazo-focus-or-launch /usr/local/bin/rakazo-page-browser /usr/local/bin/rakazo-cookie-sync \
     /usr/local/lib/rakazo/page_secrets.py \
     /etc/rakazo/fluxbox/init /etc/rakazo/fluxbox/apps /etc/rakazo/fluxbox/menu \
     /etc/profile.d/rakazo-local-bin.sh
+ARG RAKAZO_SHARED_LOGINS=off
+RUN if [ "$RAKAZO_SHARED_LOGINS" = on ]; then touch /etc/rakazo/shared-logins; fi
 # Agent-authored scripts often use the unversioned name. Keep it on the installed Python 3.
 RUN ln -s /usr/bin/python3 /usr/local/bin/python \
   && python -c 'import sys; assert sys.version_info.major == 3'
