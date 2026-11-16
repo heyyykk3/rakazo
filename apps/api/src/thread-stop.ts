@@ -21,6 +21,7 @@ import {
   transientRunEventsWhere,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { grokbotChildRuns } from "./grokbot-stop.js";
 import type { ThreadTarget } from "./thread-target.js";
 
 /** A bare "stop" or "stop now" with nothing attached: the owner's Stop, sent as text. */
@@ -73,11 +74,21 @@ export function cancelThreadRuns(
   };
   return async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+    // Fork: work this chat handed to other bots stops with it.
+    const children = helperMessageId
+      ? []
+      : await grokbotChildRuns(tx, { spaceId: actor.spaceId, threadId: target.threadId });
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
         ...(helperMessageId
           ? { ...helpers, sourceMessageId: helperMessageId }
-          : { OR: [{ threadId: target.threadId }, helpers] }),
+          : {
+              OR: [
+                { threadId: target.threadId },
+                helpers,
+                ...(children.length ? [{ id: { in: children.map((run) => run.id) } }] : []),
+              ],
+            }),
         status: { in: [...ACTIVE_RUN_STATUSES] },
       },
       data: { status: "cancelled", completedAt: new Date() },
@@ -140,17 +151,20 @@ export function cancelThreadRuns(
     // Not for a helper in a thread of its own: in the chat it would read as the bot stopping,
     // and the helper's card update tells the chat instead.
     let eventSeq: number | null = null;
+    const childIds = new Set(children.map((run) => run.id));
     for (const run of cancelled) {
-      if (run.threadId !== target.threadId) continue;
+      // A stopped child bot's own chat hears that its run ended.
+      const child = childIds.has(run.id);
+      if (run.threadId !== target.threadId && !child) continue;
       const event = await appendEventInTransaction(tx, {
         spaceId: actor.spaceId,
-        threadId: target.threadId,
+        threadId: run.threadId,
         botId: run.botId,
         type: "run.cancelled",
         runId: run.id,
         payload: {},
       });
-      eventSeq = event.seq;
+      if (!child) eventSeq = event.seq;
     }
     const named = (run: (typeof cancelled)[number]) =>
       run.trigger === "routine" && run.routine && run.routineId ? run.routine.name : undefined;

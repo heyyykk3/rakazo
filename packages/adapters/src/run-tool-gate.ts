@@ -52,6 +52,7 @@ import { RAKAZO_DOCS_URLS } from "./builtin-skills.prompt.js";
 import type { ExecutorDeps } from "./executor-deps.js";
 import { CATALOG_LOAD, CATALOG_SEARCH } from "./lazy-tool-catalog.js";
 import { findConnectedModelCredential } from "./model-selection.js";
+import { grokbotDeniedInEarlierRun, grokbotOutboundAction } from "./grokbot-gates.js";
 import { paidRequestEffect } from "./paid-request.js";
 import type { PurchaseApproval } from "./purchase-gate.js";
 import { PURCHASE_CHECKED_TOOLS, purchaseApprovalOf } from "./purchase-gate.js";
@@ -298,6 +299,13 @@ export async function gateToolCall(
   // These ask in every run, whatever started it.
   const mandatoryInAnyRun =
     paying || unattendedWatch || scheduleNamesNewSite || toolRequiresExplicitApproval(name);
+  // Fork: sending, posting, deleting and spending ask in every mode, Never ask included.
+  const outboundAction = grokbotOutboundAction({
+    name,
+    viaConnector,
+    actionNames: approvalToolNames,
+    readOnlyFor: declaredReadOnlyFor,
+  });
   // No allow rule skips these, and without them the tool needs no approval, so "Always allow"
   // on their card would save a rule that never takes effect.
   const asksEveryTime =
@@ -369,7 +377,7 @@ export async function gateToolCall(
         reviewOnly: connectorReadGated,
         checkerConfigured,
         newDestination: siteGate === "new",
-        purchase: paying,
+        purchase: paying || outboundAction,
       });
   // Nobody is there to approve a purchase, or a sign-in that asks first, a webhook run reaches.
   if (paying && run.trigger === "webhook" && plan !== "deny") {
@@ -492,7 +500,16 @@ export async function gateToolCall(
     : [];
   if (
     applied &&
-    repeatsDeniedAction({ toolName: replayEffectToolName, args, denied: deniedEarlier })
+    (repeatsDeniedAction({ toolName: replayEffectToolName, args, denied: deniedEarlier }) ||
+      (repeatChecked &&
+        (await grokbotDeniedInEarlierRun(deps.prisma, {
+          runId,
+          threadId: ctx.thread.id,
+          kind: replayEffectToolName,
+          args,
+          argsOf: (request) =>
+            boundDirectApprovalDetails(request, CATALOG_APPROVAL_TOOL)?.args ?? request,
+        }))))
   ) {
     await deps.prisma.externalEffect.updateMany({
       where: { id: applied.effect.id, status: "intended" },

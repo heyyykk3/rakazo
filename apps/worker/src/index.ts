@@ -156,7 +156,11 @@ async function main() {
   })
     ? new ChatSdkMessagingSurface(messagingPlatforms)
     : undefined;
-  const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
+  const memoryProviders = new SpaceMemoryProviderResolver(
+    prisma,
+    secrets,
+    new MarkdownMemoryStore(prisma),
+  );
   const home = createAgentHomeStore(env.dataDir, prisma);
   void home.removeStaleStaging().catch((error) => logger.error("home staging cleanup", error));
   const artifacts = createArtifactStore(env.dataDir, prisma);

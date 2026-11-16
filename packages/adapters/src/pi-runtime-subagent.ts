@@ -25,6 +25,7 @@ import {
 } from "./pi-runtime-models.js";
 import { conversationSessionId, reliableModelStream } from "./pi-runtime-stream.js";
 import type { ToolHost } from "./pi-runtime-tools.js";
+import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import { toAgentTools, toolCallBudgetExceededMessage } from "./pi-runtime-tools.js";
 import { observedPiStream } from "./pi-usage.js";
 import { subagentSystemPrompt } from "./runtime.prompt.js";
@@ -259,7 +260,7 @@ export async function executeSubagent(
       uniqueToolCallIdStream(
         fallbackAwareModelStream(
           retryState,
-          ctx,
+          fenceUntrustedToolResults(ctx),
           withAutomatedLabels({ ...options, fetch: host.modelFetch ?? options?.fetch }),
         ),
         toolCallIds,

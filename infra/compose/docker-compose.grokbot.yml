@@ -4,7 +4,6 @@
 x-grokbot-environment: &grokbot-environment
   ANTHROPIC_BASE_URL:
   RAKAZO_GROKBOT:
-  RAKAZO_GROKBOT_HELPER_MODEL:
 
 services:
   computer:

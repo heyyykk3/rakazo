@@ -85,6 +85,7 @@ import {
 import { conversationSessionId, reliableModelStream } from "./pi-runtime-stream.js";
 import { MAX_PARALLEL_SUBAGENTS } from "./pi-runtime-subagent.js";
 import type { ToolCallBudget, ToolHost } from "./pi-runtime-tools.js";
+import { fenceUntrustedToolResults } from "./grokbot-fence.js";
 import {
   agentToolDefinitions,
   createGate,
@@ -625,7 +626,7 @@ export class PiAgentRuntime implements AgentRuntime {
             uniqueToolCallIdStream(
               fallbackAwareModelStream(
                 fallbackState,
-                ctx,
+                fenceUntrustedToolResults(ctx),
                 withAutomatedLabels({ ...options, fetch: this.modelFetch ?? options?.fetch }),
               ),
               toolCallIds,

@@ -1,9 +1,11 @@
 import type { MessageBlock, ReplyMode } from "@rakazo/contracts";
 import {
   BACKGROUND_HELPER_TRIGGER,
+  HELPER_RESULT_TRIGGER,
   isBackgroundRunTrigger,
   isConversationalRun,
 } from "@rakazo/core";
+import { grokbotEnabled } from "./grokbot-flags.js";
 import { NO_RESPONSE } from "./silent-reply.js";
 import { messageUserMaxLength } from "./user-progress.js";
 
@@ -21,8 +23,21 @@ export const REACTION_SILENT_REPLY_GUIDANCE = `The user reacted with an emoji to
 
 export const GROUP_UNADDRESSED_REPLY_GUIDANCE = `This message went to every member of the group and names nobody. Members decide at about the same time, so do not count on seeing the others' replies. Before using any tools, decide whether it is for you. Answer when it falls within your own description, or when it asks each member to reply. Stay silent when it fits another member's description better, or when no member's description fits it and you are not the first member listed. To stay silent, the entire final assistant reply must be exactly ${NO_RESPONSE}, with no tool calls, never a dot, a placeholder or an empty message.`;
 
+/** Fork: a helper's result may end quietly when it changes nothing for the person. */
+export const HELPER_RESULT_QUIET_REPLY_GUIDANCE = `You were woken by a background helper's result, not by the person. When it answers or advances something the person asked for, reply with the result in a sentence or two. When it changes nothing they need to know, the entire final assistant reply must be exactly ${NO_RESPONSE}, with no message_user call.`;
+
+/** Fork: a wake the person did not send, which may end without a reply. */
+function quietWake(trigger: string): boolean {
+  return trigger === HELPER_RESULT_TRIGGER && grokbotEnabled("quiet");
+}
+
 export function runAllowsSilentEmpty(trigger: string): boolean {
-  return trigger === "reaction" || trigger === "routine" || isBackgroundRunTrigger(trigger);
+  return (
+    trigger === "reaction" ||
+    trigger === "routine" ||
+    isBackgroundRunTrigger(trigger) ||
+    quietWake(trigger)
+  );
 }
 
 /**
@@ -62,6 +77,7 @@ export function runReplyGuidance(trigger: string, replyMode: ReplyMode = "chat")
   if (replyMode === "messages") return messagesModeReplyGuidance();
   if (trigger === "reaction") return REACTION_SILENT_REPLY_GUIDANCE;
   if (isBackgroundRunTrigger(trigger)) return TICKET_SILENT_REPLY_GUIDANCE;
+  if (quietWake(trigger)) return HELPER_RESULT_QUIET_REPLY_GUIDANCE;
   return runAllowsSilentEmpty(trigger) ? ROUTINE_SILENT_REPLY_GUIDANCE : longWorkProgressGuidance();
 }
 

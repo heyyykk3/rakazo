@@ -389,7 +389,11 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       secrets,
       unreferencedMachines: machineCleanupRecords(jobs),
     }));
-  const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
+  const memoryProviders = new SpaceMemoryProviderResolver(
+    prisma,
+    secrets,
+    new MarkdownMemoryStore(prisma),
+  );
   const oauthLogins = new PiOAuthLogins<ModelCredential>(undefined, { prisma, secrets });
   const home = createAgentHomeStore(env.dataDir, prisma);
   void home.removeStaleStaging().catch((error) => getLogger().error("home staging cleanup", error));

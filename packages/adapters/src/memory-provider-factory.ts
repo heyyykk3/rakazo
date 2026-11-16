@@ -1,8 +1,15 @@
-import type { DurableMemoryScope, SecretStore, SemanticMemoryProvider } from "@rakazo/adapter-kit";
+import type {
+  DurableMemoryScope,
+  MemoryStore,
+  SecretStore,
+  SemanticMemoryProvider,
+} from "@rakazo/adapter-kit";
 import type { MemoryProviderDescriptor } from "@rakazo/contracts";
 import { settingsFieldProblem, visibleSettingsFields } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { grokbotEnabled } from "./grokbot-flags.js";
+import { GrokbotJournalMemory } from "./grokbot-journal-memory.js";
 import {
   createHindsightProvider,
   HINDSIGHT_PROVIDER_ID,
@@ -306,8 +313,10 @@ export async function loadMemoryProviderCredentials(
 
 export class SpaceMemoryProviderResolver implements MemoryProviderResolver {
   constructor(
-    private readonly prisma: Pick<PrismaClient, "spaceMemoryConfig">,
+    private readonly prisma: Pick<PrismaClient, "spaceMemoryConfig" | "bot">,
     private readonly secrets: SecretStore,
+    /** Fork: where the built-in journal memory keeps its documents. */
+    private readonly journalStore?: MemoryStore,
   ) {}
 
   async resolve(spaceId: string): Promise<ConfiguredMemoryProvider | null> {
@@ -315,7 +324,7 @@ export class SpaceMemoryProviderResolver implements MemoryProviderResolver {
       where: { spaceId },
       include: { secret: true },
     });
-    if (!config) return null;
+    if (!config) return this.journalMemory();
     const settings = toStringRecord(config.settings);
     if (memoryProviderRequiresPrivateEndpoint(config.provider, settings)) {
       // Saved configurations cannot bypass an operator's current network policy.
@@ -342,6 +351,22 @@ export class SpaceMemoryProviderResolver implements MemoryProviderResolver {
         JSON.stringify([config.id, config.secretId, config.provider]),
       ),
       defaultScope: config.defaultMemoryScope === "shared" ? "shared" : "isolated",
+    };
+  }
+
+  /** Fork: dated journals when no outside memory service is connected. */
+  private journalMemory(): ConfiguredMemoryProvider | null {
+    if (!this.journalStore || !grokbotEnabled("memory")) return null;
+    const bots = this.prisma.bot;
+    return {
+      provider: new GrokbotJournalMemory(this.journalStore, async (botId, context) => {
+        const bot = await bots.findFirst({
+          where: { id: botId, spaceId: context.spaceId },
+          select: { name: true },
+        });
+        return bot?.name;
+      }),
+      defaultScope: "shared",
     };
   }
 }
