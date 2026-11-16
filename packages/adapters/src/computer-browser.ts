@@ -23,6 +23,15 @@ import { FakeBrowserProvider } from "./fake-browser.js";
 
 const DETACHED_MESSAGE = "Page browser is not attached to this computer's Chrome.";
 
+/** A purchase check that failed: the page is unknown, so the card says so and approves no click by itself. */
+const UNCHECKED_PURCHASE: NonNullable<BrowserPurchaseCheckResult["purchase"]> = {
+  steps: [],
+  site: "",
+  label: "",
+  amount: "",
+  amountSource: "page",
+};
+
 const isPurchaseItem = (item: unknown): item is BrowserPurchaseItem =>
   typeof (item as BrowserPurchaseItem | null)?.name === "string" &&
   typeof (item as BrowserPurchaseItem).amount === "string";
@@ -30,7 +39,7 @@ const isPurchaseItem = (item: unknown): item is BrowserPurchaseItem =>
 /**
  * Whether a failed purchase check means this computer cannot check at all, rather than that the check
  * failed: a page browser from before the check ("unknown command"), none at all, or a supervisor from
- * before it. Other failures are logged separately; none establishes a purchase.
+ * before it. Every other failure asks, a 500 included: only an unhandled error answers that.
  */
 function cannotCheck(error: unknown): boolean {
   return (
@@ -253,9 +262,9 @@ export class ComputerBrowserProvider implements BrowserProvider {
     );
     if (live?.ok !== true) {
       if (!cannotCheck(live?.error)) {
-        // A failed check is not evidence that the page can complete a payment.
-        getLogger().warn("purchase check failed", { error: live?.error });
-        return { purchase: null };
+        // The check started and failed (timed out, killed, a page it could not read): ask.
+        getLogger().warn("purchase check failed, asking", { error: live?.error });
+        return { purchase: { ...UNCHECKED_PURCHASE, steps: [] } };
       }
       if (!this.purchaseCheckWarned) {
         this.purchaseCheckWarned = true;

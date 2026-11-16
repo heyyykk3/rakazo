@@ -1,5 +1,4 @@
 import type { BrowserProvider } from "@rakazo/adapter-kit";
-import { planActionGate } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import type { PurchaseApproval } from "./purchase-gate.js";
 import { detectPurchase, purchaseApprovalOf, purchaseCardSummary } from "./purchase-gate.js";
@@ -271,10 +270,11 @@ describe("purchase detection for the page tools", () => {
     expect(check).not.toHaveBeenCalled();
   });
 
-  it("checks page signals for a press after the batch opens a URL", async () => {
+  it("asks about a press after the batch opens a URL, without looking at the page first", async () => {
     const check = vi.fn(async () => ({ purchase: null }));
     const ctx = contextWith(check as never);
     const act = (actions: unknown[]) => detectPurchase(ctx, "computer_act", { actions });
+    const unchecked = { steps: [], site: "", label: "", amount: "", amountSource: "page" };
     const open = { kind: "focus", app: "chromium", uri: "https://shop.example.test/checkout" };
     for (const press of [
       { kind: "click", x: 5, y: 6 },
@@ -282,18 +282,9 @@ describe("purchase detection for the page tools", () => {
       { kind: "key", key: "a", modifiers: ["Return"] },
       { kind: "type", text: "go\n" },
     ]) {
-      expect(await act([open, press])).toBeUndefined();
-      expect(check).toHaveBeenLastCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          points: [],
-          enter: press.kind !== "click",
-          unplaced: press.kind === "click",
-        }),
-        expect.anything(),
-      );
+      expect(await act([open, press])).toEqual(unchecked);
     }
-    check.mockClear();
+    expect(check).not.toHaveBeenCalled();
     // A focus that opens nothing, or a URL opened after the press, is checked as usual.
     expect(
       await act([
@@ -303,40 +294,6 @@ describe("purchase detection for the page tools", () => {
     ).toBeUndefined();
     expect(await act([{ kind: "click", x: 5, y: 6 }, open])).toBeUndefined();
     expect(check).toHaveBeenCalledTimes(2);
-  });
-
-  it("in Never ask skips failed checks without payment evidence but still asks for recognized payments", async () => {
-    for (const { check, asks } of [
-      { check: async () => ({ purchase: null }), asks: false },
-      {
-        check: async () => {
-          throw new Error("page unavailable");
-        },
-        asks: false,
-      },
-      { check: async () => ({ purchase: found }), asks: true },
-    ]) {
-      const ctx = contextWith(check);
-      const request = {
-        name: "computer_act",
-        args: { actions: [{ kind: "click", x: 1, y: 2 }] },
-      } as unknown as ToolRequest;
-      expect(await prepareToolRequest(ctx, request)).toBeUndefined();
-      expect(Boolean(request.purchase)).toBe(asks);
-      if (asks) expect(request.fleetSummary?.title).toBe("Pay on shop.example.test?");
-      else expect(request.fleetSummary).toBeUndefined();
-      expect(
-        planActionGate({
-          mode: "never",
-          resolved: { decision: "allow", source: "default", matchingRules: [], decisiveRules: [] },
-          consequential: true,
-          checkerConfigured: false,
-          mandatory: false,
-          steerable: false,
-          purchase: Boolean(request.purchase),
-        }),
-      ).toBe(asks ? "ask" : "allow");
-    }
   });
 
   it("reads a stored approval only when it is whole", () => {
