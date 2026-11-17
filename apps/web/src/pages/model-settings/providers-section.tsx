@@ -22,6 +22,7 @@ import type { ModelCredential } from "../../lib/model-auth";
 import { useSave, useSpaceQueries } from "../../lib/query";
 import { useListSearch } from "../../lib/use-list-search";
 import { errorText } from "../../lib/user-error";
+import { groupProviderConnections } from "./provider-groups";
 import type { ConnectableProvider } from "./role-model-picker";
 
 /** Every connection the member has, with the way to add another, even for a connected provider. */
@@ -33,6 +34,7 @@ export function ProvidersSection({
   onAdd,
   onOpen,
   detail,
+  groupDetail,
   panel,
 }: {
   credentials: ModelCredential[];
@@ -47,35 +49,56 @@ export function ProvidersSection({
   /** What a connection's row says after its name, such as how many models it runs. */
   detail?: (credential: ModelCredential) => ReactNode;
   /** The form for a new connection, shown after the list. */
+  groupDetail?: (credentials: ModelCredential[]) => ReactNode;
   panel?: ReactNode;
 }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const groups = groupProviderConnections(credentials, nameOf);
   return (
     <section className="mb-8" data-testid="model-providers">
       <SectionHeading className="mb-2.5">
         <Trans>Providers</Trans>
       </SectionHeading>
       <ul className="divide-y divide-border rounded-xl border border-border">
-        {[...credentials]
-          // Saving a key reorders the account's connections; this list stays put.
-          .sort((left, right) => nameOf(left).localeCompare(nameOf(right)))
-          .map((credential) => (
-            <li key={credential.id} data-testid={`model-provider-${credential.id}`}>
-              <SettingsListRow
-                disabled={disabled}
-                onClick={() => onOpen(credential)}
-                label={nameOf(credential)}
-                labelTestId="provider-row-name"
-              >
-                {credential.reconnectRequired ? (
-                  <span className="shrink-0 text-body-sm text-warning">
-                    <Trans>Sign in again</Trans>
-                  </span>
-                ) : (
-                  detail?.(credential)
-                )}
-              </SettingsListRow>
-            </li>
-          ))}
+        {groups.map((group) => (
+          <li key={group.id} data-testid={`model-provider-${group.id}`}>
+            <SettingsListRow
+              disabled={disabled}
+              onClick={() =>
+                group.grouped
+                  ? setExpanded(expanded === group.id ? null : group.id)
+                  : onOpen(group.credentials[0]!)
+              }
+              label={group.name}
+              labelTestId="provider-row-name"
+            >
+              {group.credentials.some((entry) => entry.reconnectRequired) ? (
+                <span className="shrink-0 text-body-sm text-warning">
+                  <Trans>Sign in again</Trans>
+                </span>
+              ) : group.grouped ? (
+                groupDetail?.(group.credentials)
+              ) : (
+                detail?.(group.credentials[0]!)
+              )}
+            </SettingsListRow>
+            {group.grouped && expanded === group.id ? (
+              <ul className="border-t border-border ps-5">
+                {group.credentials.map((credential) => (
+                  <li key={credential.id}>
+                    <SettingsListRow
+                      disabled={disabled}
+                      onClick={() => onOpen(credential)}
+                      label={credential.label.replace(/^(AWS Bedrock|Azure)\s*·\s*/, "")}
+                    >
+                      {detail?.(credential)}
+                    </SettingsListRow>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
         <li>
           <AddProvider providers={providers} disabled={disabled} onPick={onAdd} />
         </li>

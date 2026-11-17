@@ -429,6 +429,9 @@ export function ModelSettingsOverlay({
               onAdd={(next) => openConnection(next, null, null, "providers:add")}
               onOpen={(entry) => openProvider(entry.id)}
               detail={(entry) => <ProviderModelCount models={providerModels(entry)} />}
+              groupDetail={(entries) => (
+                <ProviderModelCount models={entries.flatMap(providerModels)} />
+              )}
               panel={connectionAt === "providers:add" ? panelFor(true) : null}
             />
           )}
