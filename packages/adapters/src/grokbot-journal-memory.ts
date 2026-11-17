@@ -11,6 +11,7 @@ import type {
   SemanticMemorySaveRequest,
 } from "@rakazo/adapter-kit";
 import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
+import { retry } from "@rakazo/core";
 
 /**
  * Fork memory provider: dated journals behind the semantic memory interface.
@@ -213,12 +214,12 @@ export class GrokbotJournalMemory implements SemanticMemoryProvider {
     context: AdapterContext,
     change: (entries: Entry[]) => Entry[],
   ) {
-    for (let attempt = 1; ; attempt += 1) {
-      const current = await this.read(store, botId, context);
-      const next = change(current.entries);
-      const content = next.map(format).join("\n");
-      if (content === current.entries.map(format).join("\n")) return;
-      try {
+    await retry(
+      async () => {
+        const current = await this.read(store, botId, context);
+        const next = change(current.entries);
+        const content = next.map(format).join("\n");
+        if (content === current.entries.map(format).join("\n")) return;
         await this.store.commit(
           {
             ...location(store, botId),
@@ -228,12 +229,14 @@ export class GrokbotJournalMemory implements SemanticMemoryProvider {
           },
           context,
         );
-        return;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "";
-        if (message !== MEMORY_REVISION_CONFLICT_ERROR || attempt >= 3) throw error;
-      }
-    }
+      },
+      {
+        attempts: 3,
+        delayMs: 0,
+        retryable: (error) =>
+          error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR,
+      },
+    );
   }
 }
 

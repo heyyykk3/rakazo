@@ -1,4 +1,4 @@
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { MAX_MODEL_CONNECTION_LABEL } from "@rakazo/contracts";
 import {
   Button,
@@ -17,12 +17,12 @@ import {
 } from "@rakazo/ui-web";
 import { ChevronRight, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ModelCredential } from "../../lib/model-auth";
 import { useSave, useSpaceQueries } from "../../lib/query";
 import { useListSearch } from "../../lib/use-list-search";
 import { errorText } from "../../lib/user-error";
-import { groupProviderConnections } from "./provider-groups";
+import { groupProviderConnections, modelConnectionLabel } from "./provider-groups";
 import type { ConnectableProvider } from "./role-model-picker";
 
 /** Every connection the member has, with the way to add another, even for a connected provider. */
@@ -33,8 +33,7 @@ export function ProvidersSection({
   disabled,
   onAdd,
   onOpen,
-  detail,
-  groupDetail,
+  modelCount,
   panel,
 }: {
   credentials: ModelCredential[];
@@ -46,10 +45,8 @@ export function ProvidersSection({
   onAdd: (provider: ConnectableProvider) => void;
   /** Opens a connection's page. */
   onOpen: (credential: ModelCredential) => void;
-  /** What a connection's row says after its name, such as how many models it runs. */
-  detail?: (credential: ModelCredential) => ReactNode;
+  modelCount?: (credential: ModelCredential) => number;
   /** The form for a new connection, shown after the list. */
-  groupDetail?: (credentials: ModelCredential[]) => ReactNode;
   panel?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -76,11 +73,15 @@ export function ProvidersSection({
                 <span className="shrink-0 text-body-sm text-warning">
                   <Trans>Sign in again</Trans>
                 </span>
-              ) : group.grouped ? (
-                groupDetail?.(group.credentials)
-              ) : (
-                detail?.(group.credentials[0]!)
-              )}
+              ) : modelCount ? (
+                <span className="shrink-0 text-body-sm text-muted-foreground">
+                  <Plural
+                    value={group.credentials.reduce((sum, entry) => sum + modelCount(entry), 0)}
+                    one="# model"
+                    other="# models"
+                  />
+                </span>
+              ) : null}
             </SettingsListRow>
             {group.grouped && expanded === group.id ? (
               <ul className="border-t border-border ps-5">
@@ -89,10 +90,8 @@ export function ProvidersSection({
                     <SettingsListRow
                       disabled={disabled}
                       onClick={() => onOpen(credential)}
-                      label={credential.label.replace(/^(AWS Bedrock|Azure)\s*·\s*/, "")}
-                    >
-                      {detail?.(credential)}
-                    </SettingsListRow>
+                      label={modelConnectionLabel(credential, group.name)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -108,43 +107,69 @@ export function ProvidersSection({
   );
 }
 
-/** A connection's editable name, saved on its own. */
-export function ConnectionNameField({ credential }: { credential: ModelCredential }) {
+/** Renames a connection: a button that opens its name field, saved on its own. */
+export function ConnectionNameField({
+  credential,
+  disabled,
+}: {
+  credential: ModelCredential;
+  /** Another save on the connection is in flight. */
+  disabled?: boolean;
+}) {
   const { t } = useLingui();
   const queries = useSpaceQueries();
-  const nameId = useId();
-  const [name, setName] = useState(credential.label);
+  const [name, setName] = useState<string | null>(null);
   const rename = useSave({
     save: (label: string, rpc) => rpc.models.rename({ credentialId: credential.id, label }),
     stale: [queries.models.credentials.key()],
+    onSaved: () => setName(null),
   });
   const saving = rename.pending;
+  if (name === null)
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="-ms-2.5 text-muted-foreground"
+        disabled={disabled}
+        onClick={() => setName(credential.label)}
+      >
+        <Trans>Rename</Trans>
+      </Button>
+    );
   const trimmed = name.trim();
   return (
     <form
-      className="mb-6"
+      className="w-full"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!trimmed || trimmed === credential.label) return;
+        if (!trimmed || trimmed === credential.label) return setName(null);
         rename.run(trimmed);
       }}
     >
-      <label htmlFor={nameId} className="block text-body text-muted-foreground">
-        <Trans>Name</Trans>
-      </label>
-      <div className="mt-2 flex gap-2">
+      <div className="flex gap-2">
         <Input
-          id={nameId}
+          aria-label={t`Name`}
+          autoFocus
           maxLength={MAX_MODEL_CONNECTION_LABEL}
           value={name}
           onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.stopPropagation();
+            setName(null);
+          }}
           className="h-10 text-foreground"
         />
-        {trimmed && trimmed !== credential.label ? (
-          <Button type="submit" variant="secondary" className="h-10" disabled={saving}>
-            {saving ? <Trans>Saving…</Trans> : <Trans>Save</Trans>}
-          </Button>
-        ) : null}
+        <Button
+          type="submit"
+          variant="secondary"
+          className="h-10"
+          disabled={saving || disabled || !trimmed}
+        >
+          {saving ? <Trans>Saving…</Trans> : <Trans>Save</Trans>}
+        </Button>
       </div>
       {rename.error ? (
         <p className="mt-2 text-body text-destructive">

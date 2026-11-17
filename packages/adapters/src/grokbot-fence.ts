@@ -1,5 +1,5 @@
 import { grokbotEnabled } from "./grokbot-flags.js";
-import { BUILTIN_AGENT_TOOL_NAMES } from "./run-tool-selection.js";
+import { BUILTIN_AGENT_TOOL_NAMES } from "./runs/tools/run-tool-selection.js";
 
 /** Built-in tools whose results carry text from outside: pages, mail, files, programs. */
 const FENCED_BUILTIN_TOOLS = new Set([

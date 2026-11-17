@@ -1,6 +1,9 @@
+import { BACKGROUND_HELPER_TRIGGER } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { Prisma } from "@rakazo/db";
 import { grokbotEnabled } from "./grokbot-flags.js";
+import type { RunContext } from "./runs/assembly/run-context.js";
+import { refusal } from "./runs/turn/tool-refusal.js";
 
 /** Built-in tools that send, delete or spend on the person's behalf. */
 const OUTBOUND_BUILTIN_TOOLS = new Set([
@@ -163,4 +166,48 @@ export async function grokbotCardAlreadyWaiting(
     select: { id: true, runId: true },
   });
   return Boolean(waiting) && waiting?.runId !== input.runId;
+}
+
+export async function pendingCardRefusal(
+  ctx: RunContext,
+  name: string,
+  replayEffectToolName: string,
+  effectId?: string,
+) {
+  const { deps, run, runId } = ctx;
+  // Fork: the person is already looking at a card for this kind of action in this chat.
+  if (
+    effectId &&
+    (await grokbotCardAlreadyWaiting(deps.prisma, {
+      runId,
+      threadId: ctx.thread.id,
+      kind: replayEffectToolName,
+    }))
+  ) {
+    await deps.prisma.externalEffect.updateMany({
+      where: { id: effectId, status: "intended" },
+      data: { status: "denied", result: { refused: "card_already_waiting" } },
+    });
+    return {
+      result: refusal(
+        "approval_already_waiting",
+        "The person already has an approval card waiting in this chat for this kind of action. Don't ask again; tell them it's waiting for their answer.",
+      ),
+    };
+  }
+  // Nobody sees a background helper's thread, so a card there would wait forever.
+  if (run.trigger === BACKGROUND_HELPER_TRIGGER) {
+    if (effectId) {
+      await deps.prisma.externalEffect.updateMany({
+        where: { id: effectId, status: "intended" },
+        data: { status: "denied" },
+      });
+    }
+    return {
+      result: refusal(
+        "helper_cannot_ask_approval",
+        `${name} needs the owner's approval, and a background helper cannot ask. Don't retry; say in your result what the bot should ask for.`,
+      ),
+    };
+  }
 }

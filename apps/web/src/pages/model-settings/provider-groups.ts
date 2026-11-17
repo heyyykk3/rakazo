@@ -42,3 +42,10 @@ export function groupProviderConnections(
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export function modelConnectionLabel(credential: ModelCredential, groupName: string) {
+  if (!credential.label.startsWith(groupName)) return credential.label;
+  const suffix = credential.label.slice(groupName.length);
+  // Hosted connections may prefix the model label with the service and a separator.
+  return suffix.match(/^\s+\p{P}\s+(.+)$/u)?.[1] ?? credential.label;
+}

@@ -9,7 +9,7 @@ import {
 import type { ConnectorTool } from "@rakazo/adapter-kit";
 import { Type } from "typebox";
 import { grokbotEnabled } from "./grokbot-flags.js";
-import type { ToolHost } from "./pi-runtime-tools.js";
+import type { ToolHost } from "./runtime/pi/tools/pi-runtime-tools.js";
 
 export const RUN_SCRIPT_TOOL = "run_script";
 
