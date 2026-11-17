@@ -28,6 +28,7 @@ import {
   BotEmailAddressesSchema,
   BotEmailAddressSchema,
   BotEmailNameSchema,
+  EMAIL_SEND_RECIPIENTS_MAX, EMAIL_SEND_SUBJECT_MAX_CHARS, EMAIL_SEND_TEXT_MAX_CHARS,
 } from "./bots/bot-email.js";
 import {
   BotSecretMetadata,
@@ -881,6 +882,49 @@ export const appContract = {
           ),
       )
       .output(z.object({ ok: z.literal(true) })),
+    /** Saves the open draft, discards it, or sends it and records that on the message. */
+    emailReply: oc
+      .input(
+        threadTarget.safeExtend({
+          messageId: Id,
+          draftId: z.string().min(1).max(64),
+          action: z.discriminatedUnion("type", [
+            z.object({
+              type: z.literal("save"),
+              inReplyTo: z.string().max(500),
+              to: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+              cc: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+              subject: z.string().max(EMAIL_SEND_SUBJECT_MAX_CHARS),
+              body: z.string().max(EMAIL_SEND_TEXT_MAX_CHARS),
+              approval: z.enum(["needs_approval", "send_once"]),
+            }),
+            z.object({ type: z.literal("discard") }),
+            z.object({
+              type: z.literal("send"),
+              inReplyTo: z.string().max(500),
+              to: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+              cc: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+              subject: z.string().max(EMAIL_SEND_SUBJECT_MAX_CHARS),
+              body: z.string().max(EMAIL_SEND_TEXT_MAX_CHARS),
+              approval: z.enum(["needs_approval", "send_once"]),
+            }),
+          ]),
+        }),
+      )
+      .output(
+        z.object({
+          kind: z.literal("email_reply"),
+          draftId: z.string(),
+          from: z.string(),
+          inReplyTo: z.string().optional(),
+          to: z.array(z.string()),
+          cc: z.array(z.string()),
+          subject: z.string(),
+          body: z.string(),
+          status: z.enum(["ready", "sent", "discarded"]),
+          approval: z.enum(["needs_approval", "send_once"]).optional(),
+        }),
+      ),
     /** `unreadAfterSeq`: the seq read up to before this call, null when nothing was unread. */
     markRead: oc
       .input(threadTarget)

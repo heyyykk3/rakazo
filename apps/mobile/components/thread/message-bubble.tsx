@@ -51,6 +51,7 @@ import { InlineImageAttachment } from "../media/inline-image-attachment";
 import { MessageMentions } from "../messages/bot-mention";
 import { MessageCaption } from "../messages/message-caption";
 import { NativeSymbol } from "../native/native-symbol";
+import { EmailReplyCard } from "../EmailReplyCard";
 import { PageCard } from "../pages/page-card";
 import { AskBlock } from "./ask-block";
 import { McpAppCard } from "./mcp-app-card";
@@ -736,6 +737,10 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
   const choiceBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "choice" }> => block.kind === "choice",
   );
+  const emailReplyBlocks = message.blocks.filter(
+    (block): block is Extract<MessageBlock, { kind: "email_reply" }> =>
+      block.kind === "email_reply",
+  );
   const computerBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "computer" }> => block.kind === "computer",
   );
@@ -765,6 +770,14 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
           onDismissed={onChoiceDismissed ? () => onChoiceDismissed(block.question) : undefined}
           accessibilityActions={actionProps.accessibilityActions}
           onAccessibilityAction={actionProps.onAccessibilityAction}
+        />
+      ))}
+      {emailReplyBlocks.map((block) => (
+        <EmailReplyCard
+          key={block.draftId}
+          block={block}
+          messageId={message.id}
+          target={groupId ? { groupId } : { botId }}
         />
       ))}
       {computerBlocks.map((block, index) => (

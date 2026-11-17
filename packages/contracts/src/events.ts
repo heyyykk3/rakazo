@@ -5,6 +5,7 @@ import {
   OneTimeCodeTarget,
 } from "./bots/bot-secrets.js";
 import { PAGE_TITLE_MAX_LENGTH } from "./conversations/pages.js";
+import { EMAIL_SEND_RECIPIENTS_MAX, EMAIL_SEND_SUBJECT_MAX_CHARS, EMAIL_SEND_TEXT_MAX_CHARS } from "./bots/bot-email.js";
 import { Id, ThinkingLevelSchema } from "./ids.js";
 import { AgentImportSetupItemSchema } from "./integrations/agent-import-setup.js";
 import { McpTransportSchema } from "./integrations/mcp.js";
@@ -186,6 +187,19 @@ export const MessageBlock = z.discriminatedUnion("kind", [
         }),
       )
       .optional(),
+  }),
+  z.object({
+    /** A saved email draft opened for review. Edits belong to the draft, not a second copy. */
+    kind: z.literal("email_reply"),
+    draftId: z.string().min(1).max(64),
+    from: z.string().max(320),
+    inReplyTo: z.string().max(500).optional(),
+    to: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+    cc: z.array(z.string().max(320)).max(EMAIL_SEND_RECIPIENTS_MAX),
+    subject: z.string().max(EMAIL_SEND_SUBJECT_MAX_CHARS),
+    body: z.string().max(EMAIL_SEND_TEXT_MAX_CHARS),
+    status: z.enum(["ready", "sent", "discarded"]),
+    approval: z.enum(["needs_approval", "send_once"]).optional(),
   }),
   z.object({
     kind: z.literal("choice"),

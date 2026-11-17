@@ -68,6 +68,7 @@ export * from "./locale/text-direction.js";
 export * from "./locale/translate.js";
 export * from "./locale/ui-locale.js";
 export * from "./messages/attachments.js";
+export * from "./messages/email-reply-draft.js";
 export * from "./messages/events.js";
 export * from "./messages/markdown-plain.js";
 export * from "./messages/message-pages.js";

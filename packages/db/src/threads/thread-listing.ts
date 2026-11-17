@@ -2,11 +2,14 @@ import {
   ACTIVE_RUN_STATUSES,
   BACKGROUND_HELPER_TRIGGER,
   BACKGROUND_RUN_TRIGGERS,
+  emailReplyPreview,
   isDeliveryMessage,
   plainTextFromMarkdown,
 } from "@rakazo/core";
+import { z } from "zod";
 import type { PrismaClient } from "../database/client.js";
 import { Prisma } from "../database/client.js";
+import { JsonColumnMismatchError, readJsonColumn, reportJsonColumnOnce } from "../database/json-column.js";
 
 export const activeRunStatuses = [...ACTIVE_RUN_STATUSES];
 const userVisibleBotRunTriggers = ["bot_message", ...BACKGROUND_RUN_TRIGGERS];
@@ -91,6 +94,16 @@ export async function withLatestBotRuns<T extends { thread: { id: string } | nul
   });
 }
 
+const EmailReplyPreview = z.object({
+  kind: z.literal("email_reply"),
+  status: z.enum(["ready", "sent", "discarded"]),
+  subject: z.string(),
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function previewFromBlocks(blocks: unknown): string {
   const rows = Array.isArray(blocks) ? blocks : [];
   // A delivery's text is the bot's prompt, hidden in chat.
@@ -103,6 +116,21 @@ export function previewFromBlocks(blocks: unknown): string {
       typeof (block as { text?: unknown }).text === "string"
     ) {
       return plainTextFromMarkdown((block as { text: string }).text);
+    }
+  }
+  for (const block of rows) {
+    if (!isRecord(block) || block.kind !== "email_reply") continue;
+    try {
+      const parsed = readJsonColumn(
+        EmailReplyPreview,
+        block,
+        { table: "messages", column: "blocks", id: "thread-preview" },
+        "reject",
+      );
+      return emailReplyPreview(parsed);
+    } catch (error) {
+      if (!(error instanceof JsonColumnMismatchError)) throw error;
+      reportJsonColumnOnce("Email draft preview cannot be read; the row is left out", error.row);
     }
   }
   return "";

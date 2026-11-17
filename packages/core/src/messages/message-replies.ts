@@ -2,6 +2,7 @@ import type { MessageAuthor, MessageBlock, ReplyPreview } from "@rakazo/contract
 import { MessageAuthorSchema, ReplyPreviewSchema } from "@rakazo/contracts";
 import { isQuestionAskBlock } from "../asks/ask-kind.js";
 import { displayName } from "../bots/display-name.js";
+import { emailReplyPreview } from "./email-reply-draft.js";
 import { plainTextFromMarkdown } from "./markdown-plain.js";
 import { messageReaction } from "./message-reactions.js";
 import { isDeliveryMessage } from "./message-visibility.js";
@@ -168,6 +169,9 @@ export function previewMessageText(
     .join(" ")
     .trim();
   if (text) return text;
+  for (const block of message.blocks) {
+    if (block.kind === "email_reply") return emailReplyPreview(block);
+  }
   for (const block of message.blocks) {
     if (block.kind === "ask" && isQuestionAskBlock(block)) {
       const excerpt = compactReplyExcerpt(block.text.slice(0, MAX_QUOTABLE_SOURCE_LENGTH));

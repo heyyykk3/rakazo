@@ -8,7 +8,7 @@ import {
 import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { restartBotScreen, takeComputerControl } from "./computer-control.js";
+import { restartBotScreen, takeComputerControl } from "./computers/computer-control.js";
 import type { RouterDeps } from "./router.js";
 
 const lifecycle = vi.hoisted(() => ({
