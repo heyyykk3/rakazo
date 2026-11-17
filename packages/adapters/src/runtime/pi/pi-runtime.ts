@@ -466,6 +466,7 @@ export class PiAgentRuntime implements AgentRuntime {
         // Whether ending now would leave the user nothing: no text shown, no tools run, and the run
         // may not stay silent. Such a run answers with the empty-response text, so an empty model
         // reply is repeated first.
+        let toolCalls = 0;
         const wouldEndEmpty = () =>
           !request.allowSilentEmpty && toolCalls === 0 && !streamed.trim();
         let checkpointPhase: "idle" | "summarizing" | "installing" | "recovering" = "idle";

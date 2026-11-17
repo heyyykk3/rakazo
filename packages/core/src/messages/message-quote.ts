@@ -161,6 +161,8 @@ function replyBlockText(block: MessageBlock): string {
     case "bot_message_sent":
     case "bot_message_received":
       return block.text;
+    case "email_reply":
+      return block.subject;
     case "choice":
       return block.question;
     case "card":
