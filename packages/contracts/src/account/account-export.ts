@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { PageSourceSchema, PageTitleSchema } from "../conversations/pages.js";
+import { PageFormatSchema, PageSourceSchema, PageTitleSchema } from "../conversations/pages.js";
 import { Id, IsoDate, ReplyModeSchema } from "../ids.js";
 
 /**
@@ -126,6 +126,8 @@ export const AccountExportRecordSchema = z.discriminatedUnion("type", [
     botId: Id.nullable(),
     groupId: Id.nullable(),
     title: PageTitleSchema,
+    /** Absent in an archive written before HTML pages existed; read it as "jsx". */
+    format: PageFormatSchema.optional(),
     pinnedAt: IsoDate.nullable(),
     currentVersion: PageVersionNumber,
     createdAt: IsoDate,

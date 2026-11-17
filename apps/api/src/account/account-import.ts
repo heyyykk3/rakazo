@@ -13,6 +13,7 @@ import type {
   AccountExportRecord,
   AccountImportResult,
   Actor,
+  PageFormat,
 } from "@rakazo/contracts";
 import {
   ACCOUNT_EXPORT_FORMAT,
@@ -38,7 +39,7 @@ import {
 } from "@rakazo/db";
 import { bestEffort, getLogger } from "@rakazo/logging";
 import { pageViewerCode } from "@rakazo/page-kit/compile";
-import { checkPageSource } from "@rakazo/page-kit/validate";
+import { checkHtmlPageSource, checkPageSource } from "@rakazo/page-kit/validate";
 import type { Hono } from "hono";
 import { cancelBody } from "../http/http-body.js";
 import type { SpaceDeletionDeps } from "../spaces/space-deletion.js";
@@ -317,6 +318,8 @@ class SpaceImport {
   readonly threadSeqs = new Map<string, number>();
   /** Each page's newest version so far, which it opens on; 0 until one arrives. */
   readonly pageVersions = new Map<string, number>();
+  /** Each page's format, fixed on its page record; absence means the page kit. */
+  readonly pageFormats = new Map<string, PageFormat>();
   readonly seenPageVersions = new Set<string>();
   readonly artifacts = new Map<string, PendingArtifact>();
   readonly parentLinks: Array<{ botId: string; parentBotId: string }> = [];
@@ -677,6 +680,7 @@ class AccountImporter implements ArchiveSink {
       }
       case "page":
         space.pageVersions.set(record.id, 0);
+        space.pageFormats.set(record.id, record.format === "html" ? "html" : "jsx");
         await prisma.page.create({
           data: {
             id: newId(),
@@ -685,6 +689,7 @@ class AccountImporter implements ArchiveSink {
             botId: space.optional(record.botId),
             groupId: space.optional(record.groupId),
             title: record.title,
+            format: record.format === "html" ? "html" : "jsx",
             pinnedAt: date(record.pinnedAt),
             currentVersion: record.currentVersion,
             createdAt: new Date(record.createdAt),
@@ -702,7 +707,9 @@ class AccountImporter implements ArchiveSink {
         space.pageVersions.set(record.pageId, Math.max(newest, record.version));
         // The checker tightens over time and is not the security boundary (the viewer's sandbox
         // is), so a version an older release saved still imports and opens on its own error.
-        const check = checkPageSource(record.source);
+        const format = space.pageFormats.get(record.pageId) ?? "jsx";
+        const check =
+          format === "html" ? checkHtmlPageSource(record.source) : checkPageSource(record.source);
         await prisma.pageVersion.create({
           data: {
             id: newId(),
@@ -710,7 +717,11 @@ class AccountImporter implements ArchiveSink {
             version: record.version,
             title: record.title,
             source: record.source,
-            code: check.ok ? check.code : pageViewerCode(record.source),
+            code: check.ok
+              ? check.code
+              : format === "html"
+                ? record.source
+                : pageViewerCode(record.source),
             createdAt: new Date(record.createdAt),
           },
         });
