@@ -122,6 +122,7 @@ import {
   describeToolActivity,
   redactAskUserDetailInMessage,
   releaseToolCallBudget,
+  rememberStepStatus,
   toAgentTools,
   toolCallBudgetExceededMessage,
   toolCallBudgetFor,
@@ -1127,12 +1128,17 @@ export class PiAgentRuntime implements AgentRuntime {
             // Live activity feedback: without this the thread shows a bare
             // "working…" for the whole tool call with nothing actionable.
             toolActivityShowing = true;
+            const status = rememberStepStatus(host, event.toolCallId, event.toolName, event.args);
             queue.push({
               type: "progress",
-              text: describeToolActivity(event.toolName, event.args, (name) =>
-                toolsByAgentName.get(name),
+              text: describeToolActivity(
+                event.toolName,
+                event.args,
+                (name) => toolsByAgentName.get(name),
+                host.narratedTools,
               ),
               activity: true,
+              ...(status ? { modelStatus: true as const } : {}),
             });
           }
           if (event.type === "message_start" && event.message.role === "assistant") {
@@ -1331,6 +1337,8 @@ export class PiAgentRuntime implements AgentRuntime {
                 let result: AgentToolResult<JsonValue | undefined>;
                 try {
                   signal.throwIfAborted();
+                  // A replayed call keeps the status the model gave it.
+                  rememberStepStatus(host, call.id, call.name, call.arguments);
                   const args = validateToolArguments(tool, {
                     ...call,
                     arguments: (tool.prepareArguments?.(call.arguments) ??
@@ -1625,9 +1633,12 @@ export class PiAgentRuntime implements AgentRuntime {
         signal.removeEventListener("abort", stopThinking);
         queue.close();
         if (trackedBudget) {
+          // A run that made no tool call has nothing to carry over: a resumed one starts the
+          // same fresh budget. Aborted one-shot calls, such as status lines, leave no entry.
           const keepForResume =
             (signal.aborted || Boolean(resumeHost?.pausePending) || yielded) &&
-            !trackedBudget.exceeded;
+            !trackedBudget.exceeded &&
+            trackedBudget.count > 0;
           releaseToolCallBudget(request.runId, keepForResume);
         }
       }

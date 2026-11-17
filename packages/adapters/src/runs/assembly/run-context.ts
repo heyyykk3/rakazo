@@ -59,6 +59,7 @@ import type { ReplySnapshot } from "./reply-snapshot.js";
 import { restoreReply, snapshotReply } from "./reply-snapshot.js";
 import type { lazyRunComputer } from "./run-computer.js";
 import { publishMessage } from "./run-messages.js";
+import type { LiveStatusLines } from "../../run-status-lines.js";
 import type { createRunTrustLoaders } from "./run-trust.js";
 
 export type RunningHelper = Omit<Extract<MessageBlock, { kind: "subagent" }>, "kind">;
@@ -133,6 +134,10 @@ export interface ReplyState {
   textSinceLastStep: string;
   /** The working line shows a note; tool status lines wait until the bot writes again. */
   narrationStatusShowing: boolean;
+  /** This attempt resumes work an earlier one began, so the run's first step is behind it. */
+  resumesEarlierWork: boolean;
+  /** The latest step's own status line, kept to restore it when held text is cleared. */
+  lastActivityLine?: string;
   /**
    * Tool calls that land mid-sentence wait here until the narration catches up to a
    * sentence boundary, so the step chips never render in the middle of a clause.
@@ -304,6 +309,8 @@ export interface RunProviders {
  * the turn loop instead of closing over dozens of locals.
  */
 export interface RunContext {
+  /** The status model's live statuses for this run, when the member chose a status model. */
+  statusLive?: LiveStatusLines;
   deps: ExecutorDeps;
   providers: RunProviders;
   run: Run;

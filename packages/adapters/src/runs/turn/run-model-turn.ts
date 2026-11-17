@@ -216,7 +216,9 @@ function modelTurnRequest(
       pluginLine,
       agentSkillsLine,
       taughtSkillsLine,
-      replyGuidance: runReplyGuidance(run.trigger, replyMode),
+      replyGuidance: runReplyGuidance(run.trigger, replyMode, {
+        mayStaySilent: groupReplyOptional,
+      }),
       // These runs get a narrow tool set, so guidance names only the tools they have.
       disabledBuiltinTools:
         isStrategicInitiativeRun(run) || run.trigger === BACKGROUND_HELPER_TRIGGER

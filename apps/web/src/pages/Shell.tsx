@@ -1129,6 +1129,7 @@ function SpaceShell() {
             voiceReady={Boolean(voiceStatus?.ready)}
             inCall={Boolean(active) && call?.botId === active?.id}
             panelOpen={chatPanelOpen}
+            working={transcriptRunning}
             onOpenNavigation={() => setMobileSidebarOpen(true)}
             onTogglePanel={toggleChatPanel}
             onCall={(bot) => {
@@ -1154,6 +1155,9 @@ function SpaceShell() {
               scrollRequest={scrollRequest}
               onScrollRequestHandled={clearScrollRequest}
               followRequest={composer.sentCount}
+              sentTexts={composer.sentTexts}
+              unsentRequests={composer.unsentCount}
+              unsentTexts={composer.unsentTexts}
               artifactTarget={transcriptArtifactTarget}
               markedUnreadMessageId={read.markedUnreadMessageId}
               transcript={transcript}
@@ -1164,6 +1168,7 @@ function SpaceShell() {
               answerableAskIds={answerableAskIds}
               dismissableAskIds={dismissableAskIds}
               running={transcriptRunning}
+              workingRunIds={workingRuns.map((run) => run.id)}
               workingBots={workingBots}
               workingRoutine={workingRoutineName(workingRuns)}
               userBubble={userBubble}

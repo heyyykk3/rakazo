@@ -47,6 +47,8 @@ import type { RuntimeModelTarget } from "../pi-runtime-models.js";
 import { recordPiTelemetryContent, withPiTelemetrySpan } from "../usage/pi-telemetry.js";
 import { COMPUTER_MODE_TOOLS } from "./pi-runtime-computer-mode.js";
 import { parametersFor, prepareFleetArguments } from "./pi-runtime-tool-parameters.js";
+import { STEP_STATUS_DESCRIPTION, STEP_STATUS_FIELD } from "../../../step-status.tool-definition.js";
+import { narrationStatusLine, openingAcknowledgementEnabled } from "../../../runs/lifecycle/user-progress.js";
 
 export interface ToolCallBudget {
   count: number;
@@ -227,10 +229,13 @@ export function describeToolActivity(
   toolName: string,
   args: unknown,
   findTool?: (name: string) => ConnectorTool | undefined,
+  narrated?: ReadonlySet<string>,
 ): string {
+  const status = stepStatusOf(toolName, args, narrated);
+  if (status) return status;
   const record = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
   if (toolName === USE_TOOL)
-    return describeToolActivity(String(record.name), record.arguments, findTool);
+    return describeToolActivity(String(record.name), record.arguments, findTool, narrated);
   const tool = findTool?.(toolName);
   const actions = batchStepActions(tool, args);
   if (actions.length > 0) return `Using ${actions.join(", ")}`;
@@ -372,6 +377,101 @@ export function prepareRequestSecretArguments(raw: Record<string, unknown>) {
 }
 
 function toAgentTool(
+  tool: ConnectorTool,
+  host: ToolHost,
+  exposedName: string,
+  options: { deferred?: ConnectorTool[]; viaUseTool?: boolean } = {},
+): AgentTool {
+  const agentTool = buildAgentTool(tool, host, exposedName, options);
+  if (!openingAcknowledgementEnabled() || STATUSLESS_TOOLS.has(tool.name)) return agentTool;
+  const narrated = withStepStatusField(agentTool);
+  // Only a field this runtime added is read as a status; a tool's own `status` argument is
+  // the tool's business.
+  if (narrated !== agentTool) {
+    host.narratedTools ??= new Set();
+    host.narratedTools.add(exposedName);
+  }
+  return narrated;
+}
+
+/** Tools whose own text is what the person reads, so a status line would only repeat it. */
+const STATUSLESS_TOOLS = new Set(["message_user", "ask_user", "request_secret"]);
+
+/**
+ * Offers the model a `live_status` field on the tool, the line the thread shows while the call runs.
+ * It is taken out before the tool's own argument handling, so the tool never sees it.
+ */
+function withStepStatusField(agentTool: AgentTool): AgentTool {
+  const schema = agentTool.parameters as unknown as {
+    type?: unknown;
+    properties?: Record<string, unknown>;
+  };
+  // A free-form object tool, with no properties listed, keeps its schema: a grammar-constrained
+  // provider would read a lone `live_status` as the only key it may send, and the tool would
+  // get no arguments.
+  if (
+    schema?.type !== "object" ||
+    !schema.properties ||
+    Object.keys(schema.properties).length === 0 ||
+    STEP_STATUS_FIELD in schema.properties
+  )
+    return agentTool;
+  schema.properties[STEP_STATUS_FIELD] = { type: "string", description: STEP_STATUS_DESCRIPTION };
+  const prepare = agentTool.prepareArguments;
+  return {
+    ...agentTool,
+    prepareArguments: (args: unknown) => {
+      const rest = withoutStepStatus(args);
+      return prepare ? prepare(rest) : rest;
+    },
+  };
+}
+
+function withoutStepStatus(args: unknown): unknown {
+  if (!args || typeof args !== "object" || !(STEP_STATUS_FIELD in args)) return args;
+  const { [STEP_STATUS_FIELD]: _status, ...rest } = args as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * The status the model gave a call, cleaned for the working line, when it gave one. Only tools
+ * in `narrated` carry the added field; a `use_tool` call may carry it outside or, for a
+ * narrated tool, inside its arguments.
+ */
+export function stepStatusOf(
+  toolName: string,
+  args: unknown,
+  narrated: ReadonlySet<string> | undefined,
+): string | undefined {
+  if (!narrated?.has(toolName) || !args || typeof args !== "object") return undefined;
+  const record = args as Record<string, unknown>;
+  const value = record[STEP_STATUS_FIELD];
+  const text =
+    typeof value === "string" ? sanitizeSensitiveText(value).replaceAll(/\s+/g, " ").trim() : "";
+  if (text) return narrationStatusLine(text);
+  return toolName === USE_TOOL
+    ? stepStatusOf(String(record.name), record.arguments, narrated)
+    : undefined;
+}
+
+/** Remembers the status the model gave a call, by call id, for the step it becomes. */
+export function rememberStepStatus(
+  host: ToolHost,
+  callId: string,
+  toolName: string,
+  args: unknown,
+) {
+  const status = stepStatusOf(toolName, args, host.narratedTools);
+  // Calls without an id would share one key, and a concurrent one could take another's status.
+  if (!callId) return status;
+  if (status) {
+    host.stepStatuses ??= new Map();
+    host.stepStatuses.set(callId, status);
+  } else host.stepStatuses?.delete(callId);
+  return status;
+}
+
+function buildAgentTool(
   tool: ConnectorTool,
   host: ToolHost,
   exposedName: string,
@@ -541,6 +641,10 @@ function toAgentTool(
             executionId,
             response: host.modelResponses,
             ...(viaUseTool ? { viaUseTool } : {}),
+            // Remembered under the id the model gave, which may be empty: not the fallback id.
+            ...(host.stepStatuses?.has(toolCallId ?? "")
+              ? { status: host.stepStatuses.get(toolCallId ?? "") }
+              : {}),
           });
           const startedAt = Date.now();
           let result: unknown;
@@ -798,6 +902,10 @@ export interface EventQueue {
 }
 
 export interface ToolHost {
+  /** Tools offered the added `live_status` field, by the name the model calls them. */
+  narratedTools?: Set<string>;
+  /** The status the model gave each call, by Pi tool call id, read from its raw arguments. */
+  stepStatuses?: Map<string, string>;
   context?: Partial<AdapterContext>;
   modelFetch?: typeof globalThis.fetch;
   onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];

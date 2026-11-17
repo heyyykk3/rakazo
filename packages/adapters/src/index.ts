@@ -257,6 +257,7 @@ export * from "./secrets/secret-store-factory.js";
 export * from "./secrets/secrets.js";
 export * from "./secrets/vault/page-share-secrets.js";
 export { listVaultItemUses } from "./secrets/vault/vault-activity.js";
+export { openingAcknowledgementEnabled } from "./runs/lifecycle/user-progress.js";
 export {
   migrateVaultValues,
   openSealedVaultValue,
