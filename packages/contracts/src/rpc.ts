@@ -28,7 +28,9 @@ import {
   BotEmailAddressesSchema,
   BotEmailAddressSchema,
   BotEmailNameSchema,
-  EMAIL_SEND_RECIPIENTS_MAX, EMAIL_SEND_SUBJECT_MAX_CHARS, EMAIL_SEND_TEXT_MAX_CHARS,
+  EMAIL_SEND_RECIPIENTS_MAX,
+  EMAIL_SEND_SUBJECT_MAX_CHARS,
+  EMAIL_SEND_TEXT_MAX_CHARS,
 } from "./bots/bot-email.js";
 import {
   BotSecretMetadata,

@@ -8,11 +8,13 @@ import {
   containsSecret,
   displayName,
   isBackgroundRunTrigger,
+  isToolActivityBlock,
   redactSecrets,
   withoutLastToolStepNotes,
 } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
 import { resolveBotWorkspacePath } from "../../computers/screens/computer-support.js";
+import { grokbotEnabled } from "../../grokbot-flags.js";
 import {
   answeredSteeringMessageIds,
   retainsConversationTurn,
@@ -246,12 +248,19 @@ async function finalReply(ctx: RunContext) {
   recordExplicitNoResponse(reply, reply.lastDiscardedMidTurnNarration);
   // When nothing follows the last step, the notes since the last interim message are the reply.
   // Messages mode keeps only the latest one; the earlier ones were private working.
+  const needsDirectResult =
+    grokbotEnabled("prompt") &&
+    (run.trigger === "user" || run.trigger === "follow_up") &&
+    !ctx.allowSilentEmptyRun &&
+    !ctx.groupReplyOptional &&
+    !ctx.state.handedOff;
   const fallbackNotes =
     ctx.replyMode === "messages" ? reply.workingNotes.slice(-1) : reply.workingNotes;
   if (
     !isBackgroundRunTrigger(run.trigger) &&
     !ctx.state.handedOff &&
     !reply.explicitNoResponse &&
+    !needsDirectResult &&
     reply.workingNotes.length > 0 &&
     !reply.textSinceLastStep.trim()
   ) {
@@ -268,6 +277,7 @@ async function finalReply(ctx: RunContext) {
     !ctx.state.handedOff &&
     !reply.explicitNoResponse &&
     !reply.assembled.trim() &&
+    !needsDirectResult &&
     reply.lastDiscardedMidTurnNarration &&
     !reply.midTurnUserTexts.includes(reply.lastDiscardedMidTurnNarration)
   ) {
@@ -305,6 +315,18 @@ async function finalReply(ctx: RunContext) {
   if (!silentReply.assembled || isBackgroundRunTrigger(run.trigger)) {
     // Mid-turn progress already posted durable chat messages; skip the empty
     // "…" fallback so we do not add a junk final bubble.
+    const missingDirectResult =
+      needsDirectResult &&
+      !reply.publishedTerminalSubagent &&
+      completionBlocks.every(
+        (block) => isToolActivityBlock(block) || (block.kind === "text" && !block.text.trim()),
+      );
+    if (missingDirectResult) {
+      completionBlocks = [
+        ...completionBlocks,
+        { kind: "text", text: "I couldn’t confirm a final result for this request." },
+      ];
+    }
     completionBlocks = completionMessageSegments(completionBlocks, {
       allowSilentEmpty:
         ctx.allowSilentEmptyRun || reply.publishedMidTurnUserMessage || groupSilentEnd,

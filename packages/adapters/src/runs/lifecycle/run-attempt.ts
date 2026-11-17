@@ -24,6 +24,7 @@ import {
   renewComputerExecutionLease,
 } from "../../computers/computer-lifecycle.js";
 import { lateRoutineRunDueAt } from "../../routines/routine-lateness.js";
+import type { LiveStatusLines } from "../../run-status-lines.js";
 import type {
   RunComputerUseState,
   RunLeaseState,
@@ -38,7 +39,6 @@ import type { TakeoverContinuePlan } from "../turn/takeover-resume.js";
 import { takeoverContinuePlan } from "../turn/takeover-resume.js";
 import { wakeRun } from "../wakeups/wake-run.js";
 import { claimRun, finishRunAttempt, renewRunLease, requeueComputerRun } from "./run-lifecycle.js";
-import type { LiveStatusLines } from "../../run-status-lines.js";
 
 const RUN_HEARTBEAT_MS = 60_000;
 

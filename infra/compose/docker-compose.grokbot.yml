@@ -5,6 +5,7 @@ x-grokbot-environment: &grokbot-environment
   ANTHROPIC_BASE_URL:
   AZURE_OPENAI_BASE_URL:
   RAKAZO_GROKBOT:
+  RAKAZO_OPENING_ACKNOWLEDGEMENT: ${RAKAZO_OPENING_ACKNOWLEDGEMENT:-1}
 
 services:
   computer:

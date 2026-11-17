@@ -1,4 +1,5 @@
-import { EmailRecipientRejectedError, type TransactionalEmailProvider } from "@rakazo/adapter-kit";
+import type { TransactionalEmailProvider } from "@rakazo/adapter-kit";
+import { EmailRecipientRejectedError } from "@rakazo/adapter-kit";
 import {
   loadCommandVariables,
   loadLoginPasswordRedactions,
@@ -398,9 +399,16 @@ async function dispatch(
     );
   } catch (error) {
     if (error instanceof EmailRecipientRejectedError) {
-      await deps.prisma.botEmailMessage.deleteMany({ where: { botId: loaded.bot.id, key, sent: false } });
+      await deps.prisma.botEmailMessage.deleteMany({
+        where: { botId: loaded.bot.id, key, sent: false },
+      });
     } else {
-      throw new ClientError("SERVICE_UNAVAILABLE", "Delivery is unconfirmed. Check sent mail before trying again.", "EMAIL_REPLY_UNCONFIRMED", { cause: error });
+      throw new ClientError(
+        "SERVICE_UNAVAILABLE",
+        "Delivery is unconfirmed. Check sent mail. This draft is locked to prevent a duplicate.",
+        "EMAIL_REPLY_UNCONFIRMED",
+        { cause: error },
+      );
     }
     const message = emailReplyDeliveryError(error);
     if (message) {
@@ -436,9 +444,14 @@ async function readClaim(
 /** An uncertain send may have reached the provider. Never dispatch that draft again automatically. */
 function resolveClaim(earlier: ClaimRow | null): SentCopy | "in_flight" | null {
   if (!earlier) return null;
-  if (earlier.sent) return { subject: earlier.subject, body: earlier.text, to: earlier.to, cc: earlier.cc };
+  if (earlier.sent)
+    return { subject: earlier.subject, body: earlier.text, to: earlier.to, cc: earlier.cc };
   if (Date.now() - earlier.receivedAt.getTime() < EMAIL_REPLY_CLAIM_STALE_MS) return "in_flight";
-  throw new ClientError("CONFLICT", "Delivery is unconfirmed. Check sent mail before trying again.", "EMAIL_REPLY_UNCONFIRMED");
+  throw new ClientError(
+    "CONFLICT",
+    "Delivery is unconfirmed. Check sent mail. This draft is locked to prevent a duplicate.",
+    "EMAIL_REPLY_UNCONFIRMED",
+  );
 }
 
 async function createClaim(

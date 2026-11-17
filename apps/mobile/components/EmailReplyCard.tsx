@@ -6,10 +6,10 @@ import type { EmailReplyCommitAction } from "@rakazo/core";
 import { typeScale } from "@rakazo/ui-tokens";
 import { useRef } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { errorText } from "../lib/api/user-error";
 import { useMobileTokens } from "../lib/native/native";
 import type { SaveSend } from "../lib/query/query";
 import { useSave } from "../lib/query/query";
-import { errorText } from "../lib/api/user-error";
 
 type EmailReplyBlock = Extract<MessageBlock, { kind: "email_reply" }>;
 type ThreadTarget = { botId: string } | { groupId: string };

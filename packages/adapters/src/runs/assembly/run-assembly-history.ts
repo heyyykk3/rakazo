@@ -5,6 +5,7 @@ import { isPartialReplyClientNonce, storedMessageBlocks } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { loadAgentMemoryContext } from "../../memory/memory-context.js";
 import { PARTIAL_REPLY_NOTE } from "../../messaging/automated-messages.prompt.js";
+import { startStatusLines } from "../../run-status-lines.js";
 import {
   historyWindowSize,
   selectCompactedHistory,
@@ -20,12 +21,12 @@ import {
   neutralizeSpeakerLabels,
 } from "../../runtime/context/history-speakers.js";
 import { loadAgentScratchpadContext } from "../../runtime/context/scratchpad-context.js";
+import { createStatusLineWriter } from "../../status-lines.js";
 import { loadAgentTicketContext } from "../../tasks/ticket-context.js";
 import type { RunHold } from "../lifecycle/run-attempt.js";
 import { loadCurrentTurnImages } from "../turn/run-turn-images.js";
 import { messageToAgentHistorySegments, messageToAgentHistoryText } from "./reply-context.js";
 import type { ConnectedRun, RunRecords, SavedTurn } from "./run-assembly-records.js";
-import type { RunHold } from "../lifecycle/run-attempt.js";
 import { threadContextForRun } from "./run-instructions.prompt.js";
 import {
   DELEGATED_EMPTY_NOTICE,
@@ -33,8 +34,6 @@ import {
   runNarratesLive,
   runReplyMode,
 } from "./run-replies.prompt.js";
-import { startStatusLines } from "../../run-status-lines.js";
-import { createStatusLineWriter } from "../../status-lines.js";
 
 export async function readThreadHistory(hold: RunHold, parts: { records: RunRecords }) {
   const { deps, run } = hold;

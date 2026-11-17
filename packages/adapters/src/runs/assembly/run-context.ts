@@ -38,6 +38,7 @@ import type { ComputerExecutionLease } from "../../computers/computer-lifecycle.
 import type { UnchangedVisualStreak } from "../../computers/screens/computer-tools.js";
 import type { selectRunConnections } from "../../connectors/connection-context.js";
 import type { loadBotMessageContext } from "../../messaging/bot-messages.js";
+import type { LiveStatusLines } from "../../run-status-lines.js";
 import { namedAgentTools } from "../../runtime/pi/tools/pi-runtime-tools.js";
 import type { inferScript } from "../../runtime/scripted-runtime.js";
 import type { VaultItemUse } from "../../secrets/bot-secrets.js";
@@ -59,7 +60,6 @@ import type { ReplySnapshot } from "./reply-snapshot.js";
 import { restoreReply, snapshotReply } from "./reply-snapshot.js";
 import type { lazyRunComputer } from "./run-computer.js";
 import { publishMessage } from "./run-messages.js";
-import type { LiveStatusLines } from "../../run-status-lines.js";
 import type { createRunTrustLoaders } from "./run-trust.js";
 
 export type RunningHelper = Omit<Extract<MessageBlock, { kind: "subagent" }>, "kind">;

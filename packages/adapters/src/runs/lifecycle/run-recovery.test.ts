@@ -68,7 +68,7 @@ describe("run recovery blockers", () => {
     });
   });
 
-  it("lets a routine that still holds the computer start while a person's run waits on it", async () => {
+  it("lets the lease holder and the person's run start; the computer arbitrates at first use", async () => {
     const now = new Date();
     const waitingForPeople = vi.fn(async () => [{ id: "chat", botId: "bot" }]);
     const prisma = {
@@ -95,7 +95,7 @@ describe("run recovery blockers", () => {
       [run("held-routine", "routine"), run("chat", "user")],
       now,
     );
-    expect([...blockers]).toEqual([["chat", "held-routine"]]);
+    expect([...blockers]).toEqual([]);
     expect(waitingForPeople).not.toHaveBeenCalled();
   });
 });

@@ -32,9 +32,6 @@ import {
   uncertainEffectResult,
 } from "../../approvals/approval-effect.js";
 import { fenceUntrustedToolResults } from "../../grokbot-fence.js";
-import { withAutomatedLabels } from "../../messaging/automated-messages.js";
-import { withCloudflareAuth } from "../../models/endpoints/cloudflare-ai-gateway.js";
-import { imagePartCount } from "../context/context-pruning.js";
 import {
   boundedInRunCheckpoint,
   compactedInRunContext,
@@ -44,6 +41,8 @@ import {
   isInRunCheckpointPrompt,
   shouldCreateInRunCheckpoint,
 } from "../../in-run-checkpoint.js";
+import { withAutomatedLabels } from "../../messaging/automated-messages.js";
+import { withCloudflareAuth } from "../../models/endpoints/cloudflare-ai-gateway.js";
 import {
   CUT_REPLY_CONTINUATION_PROMPT,
   cutReplyAtLimitPrompt,
@@ -62,6 +61,7 @@ import {
   unresolvedTurnCheckpointCalls,
 } from "../../runs/turn/turn-checkpoint.js";
 import { deliverFinishedShells } from "../../sandboxes/shell-command-stream.js";
+import { imagePartCount } from "../context/context-pruning.js";
 import { neutralizeSpeakerLabels } from "../context/history-speakers.js";
 import type { RuntimeContextDecision } from "../context/runtime-context.js";
 import { createRuntimeContextPolicy } from "../context/runtime-context.js";
@@ -738,20 +738,22 @@ export class PiAgentRuntime implements AgentRuntime {
               : async () => apiKey,
           finishTurn: async (turn, turnSignal) => {
             let finishedShells: string | undefined;
-            if (checkpointPhase !== "summarizing") await deliverFinishedShells(
-              (text) => {
-                finishedShells = text;
-              },
-              host.pendingShells,
-              turn,
-              turnSignal,
-            );
+            if (checkpointPhase !== "summarizing")
+              await deliverFinishedShells(
+                (text) => {
+                  finishedShells = text;
+                },
+                host.pendingShells,
+                turn,
+                turnSignal,
+              );
             // Between steps a stopping process hands the turn back, so the next process resumes
             // here instead of repeating a step cut off at the drain limit. A running shell's
             // output would only reach this process, so the turn keeps going until it is read.
             // The hand-back is only a shortcut: when it fails, the turn goes on here as before.
             if (
-              checkpointPhase === "idle" && request.yieldSignal?.aborted &&
+              checkpointPhase === "idle" &&
+              request.yieldSignal?.aborted &&
               !handBackFailed &&
               turn.toolResults.length > 0 &&
               !turnSignal?.aborted &&

@@ -43,6 +43,14 @@ import {
 import { ActiveBotGlyph } from "../../components/ai/CollaborationMarker";
 import { VoiceChatCard } from "../../components/call/VoiceChatCard";
 import type { ArtifactTarget } from "../../lib/artifact-open";
+import type { PendingSend } from "../../lib/chat/sent-message-entrance";
+import {
+  SENT_ENTRANCE_KEYFRAMES,
+  SENT_ENTRANCE_TIMING,
+  sentMessageEntrances,
+  withNewSends,
+  withoutUnsent,
+} from "../../lib/chat/sent-message-entrance";
 import { projectPageCards } from "../../lib/page-cards";
 import {
   isDetachedRange,
@@ -50,14 +58,6 @@ import {
   quoteDraftForSelection,
 } from "../../lib/quote-selection";
 import type { createSpaceRpc } from "../../lib/rpc";
-import type { PendingSend } from "../../lib/sent-message-entrance";
-import {
-  SENT_ENTRANCE_KEYFRAMES,
-  SENT_ENTRANCE_TIMING,
-  sentMessageEntrances,
-  withNewSends,
-  withoutUnsent,
-} from "../../lib/sent-message-entrance";
 import { messageHasVisibleBlocks } from "../../lib/tool-activity-view";
 import { TRANSCRIPT_CONTENT_PADDING } from "../../lib/transcript-layout";
 import { transcriptIsNearEnd, transcriptMovedDown } from "../../lib/transcript-scroll";

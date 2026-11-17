@@ -213,11 +213,13 @@ export const memoryTools: ConnectorTool[] = [
   },
   {
     name: "recall_memory",
-    description: "Semantically search this bot's durable memory for facts relevant to a query.",
+    description:
+      "Semantically search durable memory. Before forgetting a fact, search with forForget. Forget every exact matching copy in the requested scope. Ask which one if the wording is ambiguous.",
     inputSchema: {
       type: "object",
       properties: {
         query: { type: "string" },
+        forForget: { type: "boolean", description: "Find individual facts that can be forgotten." },
       },
       required: ["query"],
     },

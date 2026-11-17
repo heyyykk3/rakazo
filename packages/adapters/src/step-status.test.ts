@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RunContext } from "./runs/assembly/run-context.js";
+import {
+  longWorkProgressGuidance,
+  replyGuidanceForOfferedTools,
+  runReplyGuidance,
+} from "./runs/assembly/run-replies.prompt.js";
+import { isOpeningAcknowledgement } from "./runs/lifecycle/run-progress.js";
 import type { ToolHost } from "./runtime/pi/tools/pi-runtime-tools.js";
 import {
   describeToolActivity,
@@ -6,13 +13,6 @@ import {
   stepStatusOf,
   toAgentTools,
 } from "./runtime/pi/tools/pi-runtime-tools.js";
-import type { RunContext } from "./runs/assembly/run-context.js";
-import { isOpeningAcknowledgement } from "./runs/lifecycle/run-progress.js";
-import {
-  longWorkProgressGuidance,
-  replyGuidanceForOfferedTools,
-  runReplyGuidance,
-} from "./runs/assembly/run-replies.prompt.js";
 
 /** Tools this runtime offered the `live_status` field to. */
 const narrated = new Set(["shell", "use_tool", "create_space"]);

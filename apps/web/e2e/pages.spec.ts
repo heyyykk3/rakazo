@@ -308,14 +308,20 @@ test("a bot's page shows in its reply, opens full screen, is shared by link and 
   await expect(pageFrame(page, title).getByRole("switch", { name: "Targets shown" })).toBeChecked();
 
   // Links in the page ask first, as links in chat do, then open in a new tab through the app.
-  await pageFrame(page, title).getByRole("link", { name: "https://example.com/metrics" }).click();
+  const metricsUrl = "https://example.com/metrics";
+  await page
+    .context()
+    .route(metricsUrl, (route) =>
+      route.fulfill({ contentType: "text/html", body: "<title>Metrics</title>" }),
+    );
+  await pageFrame(page, title).getByRole("link", { name: metricsUrl }).click();
   const leave = page.getByRole("alertdialog", { name: "Open external link?" });
   await expect(leave).toContainText("example.com/metrics");
   const [popup] = await Promise.all([
     page.context().waitForEvent("page"),
     leave.getByRole("button", { name: "Open", exact: true }).click(),
   ]);
-  expect(popup.url()).toBe("https://example.com/metrics");
+  await expect(popup).toHaveURL(metricsUrl);
   await popup.close();
 
   await view.getByRole("button", { name: title }).click();

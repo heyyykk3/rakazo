@@ -182,6 +182,7 @@ export { createRunTrustLoaders } from "./runs/assembly/run-trust.js";
 export * from "./runs/executor/executor.js";
 export { notifyMemberMessage } from "./runs/lifecycle/run-notifications.js";
 export { loadRunOrigin } from "./runs/lifecycle/run-origin.js";
+export { openingAcknowledgementEnabled } from "./runs/lifecycle/user-progress.js";
 export * from "./runs/lifecycle/work-activity.js";
 export * from "./runs/wakeups/background-job-handlers.js";
 export * from "./runs/wakeups/job-reconciler.js";
@@ -257,7 +258,6 @@ export * from "./secrets/secret-store-factory.js";
 export * from "./secrets/secrets.js";
 export * from "./secrets/vault/page-share-secrets.js";
 export { listVaultItemUses } from "./secrets/vault/vault-activity.js";
-export { openingAcknowledgementEnabled } from "./runs/lifecycle/user-progress.js";
 export {
   migrateVaultValues,
   openSealedVaultValue,

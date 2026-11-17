@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { currentApiBase } from "../../lib/api/api";
 import { useMobileTokens, useResolvedAppearance } from "../../lib/native/native";
-import { pageActionAllowed, pageDocument, pageTapStart } from "../../lib/pages";
+import { pageActionAllowed, pageDocument, pageTapStart } from "../../lib/pages/pages";
 import { SandboxedHtmlPreview } from "../media/sandboxed-html-preview";
 
 /** Before the page reports its height, the frame gets room to draw and measure. */

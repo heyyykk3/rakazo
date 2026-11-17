@@ -4,16 +4,16 @@ import { isModelRequiredSendError } from "@rakazo/core";
 import { sendEntrance, typeScale } from "@rakazo/ui-tokens";
 import { useState } from "react";
 import { Alert, Image, Platform, Pressable, Text, View } from "react-native";
+import type { EntryExitAnimationFunction } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, useReducedMotion, withTiming } from "react-native-reanimated";
 import type { UserBubble } from "../../lib/messages/user-bubble";
 import { withUserBubble } from "../../lib/messages/user-bubble";
 import { openModelSettings } from "../../lib/models/model-settings";
 import { showIOSActionSheet } from "../../lib/native/ios-action-sheet";
 import { useMobileTokens } from "../../lib/native/native";
 import type { SendAttempt } from "../../lib/thread/send/thread-feedback";
-import { NativeSymbol } from "../native/native-symbol";
-import type { EntryExitAnimationFunction } from "react-native-reanimated";
-import Animated, { Easing, FadeIn, useReducedMotion, withTiming } from "react-native-reanimated";
 import { isFreshSend } from "../../lib/thread/send/thread-feedback";
+import { NativeSymbol } from "../native/native-symbol";
 
 /**
  * A message just sent rises into place above the composer: it starts this far below and this

@@ -31,6 +31,7 @@ export type HindsightWriteResponse =
   | { ok: false; error: string; status?: number };
 
 export interface HindsightRecallResult {
+  factId?: string;
   text: string;
   updatedAt?: string;
   score: number;
@@ -48,7 +49,7 @@ async function hindsightRequest(
   path: string,
   body: unknown,
   options: {
-    method?: "GET" | "POST" | "DELETE";
+    method?: "GET" | "POST" | "PATCH" | "DELETE";
     timeoutMs?: number;
     signal?: AbortSignal;
     readJson?: boolean;
@@ -61,7 +62,7 @@ async function hindsightRequest(
   const signal = requestSignal(options.timeoutMs ?? HINDSIGHT_TIMEOUT_MS, options.signal);
   const url = `${config.baseUrl.replace(/\/+$/, "")}${path}`;
   const method = options.method ?? "POST";
-  const sendsBody = method === "POST";
+  const sendsBody = method === "POST" || method === "PATCH";
   const init: RequestInit = {
     method,
     headers: {
@@ -191,9 +192,27 @@ function parseRecallResult(value: unknown): HindsightRecallResult | undefined {
   const final = (result.scores as { final?: unknown } | null | undefined)?.final;
   return {
     text: result.text,
+    ...(typeof result.id === "string" && (result.type === "world" || result.type === "experience")
+      ? { factId: result.id }
+      : {}),
     ...(updatedAt ? { updatedAt } : {}),
     score: typeof final === "number" && Number.isFinite(final) ? final : 0,
   };
+}
+
+export async function invalidateHindsightFact(
+  config: HindsightConnectionConfig,
+  bank: string,
+  id: string,
+  reason: string | undefined,
+  signal: AbortSignal,
+) {
+  return hindsightRequest(
+    config,
+    `${bankPath(bank)}/memories/${encodeURIComponent(id)}`,
+    { state: "invalidated", ...(reason ? { reason } : {}) },
+    { method: "PATCH", signal, timeoutMs: HINDSIGHT_PURGE_TIMEOUT_MS },
+  );
 }
 
 /** A bank nothing was retained to answers 404; it has nothing to find. */

@@ -13,7 +13,6 @@ import type * as ComputerLifecycleModule from "../../computers/computer-lifecycl
 import { PARTIAL_REPLY_NOTE } from "../../messaging/automated-messages.prompt.js";
 import { loadBotMessageContext, returnBotMessageOutcome } from "../../messaging/bot-messages.js";
 import type * as ModelVisionModule from "../../models/model-vision.js";
-import { createJobReconciler } from "../wakeups/job-reconciler.js";
 import {
   GROUP_UNADDRESSED_REPLY_GUIDANCE,
   messagesModeReplyGuidance,
@@ -662,6 +661,16 @@ describe("notes that can't be posted as messages", () => {
   it("keeps the last note as the reply when nothing comes after the last step", async () => {
     const { finalizeRun } = await runTurn("", false);
     expect(finalText(finalizeRun)).toBe("I will check that.");
+  });
+
+  it("reports an unconfirmed result when a direct fork turn ends with only a working note", async () => {
+    vi.stubEnv("RAKAZO_GROKBOT", "prompt");
+    try {
+      const { finalizeRun } = await runTurn("", false);
+      expect(finalText(finalizeRun)).toBe("I couldn’t confirm a final result for this request.");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("posts three notes on a long turn and shows the rest only as the working line", async () => {

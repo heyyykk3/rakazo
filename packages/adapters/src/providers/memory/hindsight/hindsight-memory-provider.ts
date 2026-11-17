@@ -3,6 +3,8 @@ import type {
   AdapterContext,
   DurableMemoryScope,
   SemanticMemoryConversationRequest,
+  SemanticMemoryForgetRequest,
+  SemanticMemoryForgetResponse,
   SemanticMemoryProvider,
   SemanticMemoryPurgeHistoryRequest,
   SemanticMemoryRecallRequest,
@@ -33,6 +35,7 @@ import {
   HINDSIGHT_WRITE_TIMEOUT_MS,
   hindsightBankExists,
   hindsightOperationStatus,
+  invalidateHindsightFact,
   listHindsightDocumentIdsByTag,
   probeHindsightKey,
   recallHindsight,
@@ -457,15 +460,16 @@ export class HindsightMemoryProvider implements SemanticMemoryProvider {
   ): Promise<SemanticMemoryResponse<SemanticMemoryResult[]>> {
     const query = request.query.trim();
     if (!query) return { ok: true, value: [] };
-    const signal = this.localHost
-      ? AbortSignal.any([context.signal, AbortSignal.timeout(HINDSIGHT_RECALL_TIMEOUT_MS)])
-      : context.signal;
+    // Preloading is opportunistic. An explicit lookup keeps the full retrieval budget.
+    const timeout = request.includeExternal === false ? 2000 : HINDSIGHT_RECALL_TIMEOUT_MS;
+    const signal = this.localHost || request.includeExternal === false
+      ? AbortSignal.any([context.signal, AbortSignal.timeout(timeout)]) : context.signal;
     const connection = await this.connectionForRequest(signal);
     if (!connection.ok) return connection;
     const written = writeBanks(context.spaceId, request.botId, request.scope);
     const banks = [
       ...written,
-      ...(request.includeExternal === false
+      ...(request.forForget || request.includeExternal === false
         ? []
         : this.options.recallBanks.filter((bank) => !written.includes(bank))),
     ];
@@ -473,7 +477,11 @@ export class HindsightMemoryProvider implements SemanticMemoryProvider {
       query: truncateChars(query, MAX_QUERY_CHARS),
       budget: this.options.recallBudget,
       max_tokens: RECALL_MAX_TOKENS,
-      types: this.options.recallFacts ? ["observation", "world", "experience"] : ["observation"],
+      types: request.forForget
+        ? ["world", "experience"]
+        : this.options.recallFacts
+          ? ["observation", "world", "experience"]
+          : ["observation"],
       ...(this.options.skipUnrelated ? { min_scores: { reranker: MIN_RERANKER_SCORE } } : {}),
     };
     const stateKey = this.stateKey;
@@ -510,6 +518,7 @@ export class HindsightMemoryProvider implements SemanticMemoryProvider {
       for (const memory of answer.value) {
         results.push({
           memory: memory.text,
+          ...(!external && memory.factId ? { id: memory.factId, entity: bank } : {}),
           score: memory.score,
           ...(memory.updatedAt ? { updatedAt: memory.updatedAt } : {}),
           ...(external ? { external: true as const } : {}),
@@ -522,6 +531,8 @@ export class HindsightMemoryProvider implements SemanticMemoryProvider {
     // Stable sorting keeps the own bank first on ties. Rank before deduplication so a repeated
     // fact keeps its strongest match instead of its first bank's lower score.
     results.sort((left, right) => right.score - left.score);
+    if (request.forForget)
+      return { ok: true, value: results.filter((r) => r.id && r.entity).slice(0, request.limit) };
     const seen = new Set<string>();
     const unique = results.filter((result) => {
       const text = result.memory.trim();
@@ -530,6 +541,36 @@ export class HindsightMemoryProvider implements SemanticMemoryProvider {
       return true;
     });
     return { ok: true, value: unique.slice(0, request.limit) };
+  }
+
+  async forget(
+    request: SemanticMemoryForgetRequest,
+    context: AdapterContext,
+  ): Promise<SemanticMemoryForgetResponse> {
+    const bank = request.entity;
+    if (
+      !bank ||
+      request.botId !== context.botId ||
+      !writeBanks(context.spaceId, request.botId, request.scope).includes(bank) ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.id)
+    ) {
+      return {
+        ok: false,
+        error: "Choose an individual fact from a forgettable recall in this bot's memory.",
+      };
+    }
+    const connection = await this.connectionForRequest(context.signal);
+    if (!connection.ok) return connection;
+    const result = await invalidateHindsightFact(
+      connection.value,
+      bank,
+      request.id,
+      request.reason,
+      context.signal,
+    );
+    return result.ok
+      ? { ok: true, value: { id: request.id, expired: true, reason: request.reason ?? null } }
+      : result;
   }
 
   async save(

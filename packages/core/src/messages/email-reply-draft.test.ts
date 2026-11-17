@@ -93,6 +93,16 @@ describe("email reply drafts", () => {
     expect(draft.status).toBe("ready");
   });
 
+  it("keeps an unfinished placeholder in the draft until the user replaces it", () => {
+    const draft = applyEmailReplyEdit(createEmailReplyDraft(original), {
+      body: "Meet at [FILL IN].",
+    });
+    expect(() => emailReplyOutbound(draft)).toThrow(/placeholder/);
+    expect(emailReplyOutbound(applyEmailReplyEdit(draft, { body: "Meet at noon." })).body).toBe(
+      "Meet at noon.",
+    );
+  });
+
   it("reopens a stored block, including one whose address would not send", () => {
     const draft = applyEmailReplyEdit(createEmailReplyDraft(original), { cc: "matt@example.com" });
     const block = emailReplyBlock(draft);

@@ -500,6 +500,8 @@ export type SemanticMemoryResponse<T = void> =
   | { ok: false; error: string };
 
 export interface SemanticMemoryRecallRequest {
+  /** Request individually forgettable facts rather than a derived summary. */
+  forForget?: boolean;
   query: string;
   /** Automatic context excludes imported sources; explicit reads may include them. */
   includeExternal?: boolean;

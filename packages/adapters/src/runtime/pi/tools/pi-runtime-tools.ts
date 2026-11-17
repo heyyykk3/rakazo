@@ -21,6 +21,10 @@ import {
 } from "../../../approvals/approval-effect.js";
 import { RUN_SCRIPT_TOOL, runScriptAgentTool } from "../../../grokbot-codemode.js";
 import { isVerbatimMcpResult } from "../../../mcp/verbatim-mcp-result.js";
+import {
+  narrationStatusLine,
+  openingAcknowledgementEnabled,
+} from "../../../runs/lifecycle/user-progress.js";
 import { providerToolCallId } from "../../../runs/turn/tool-call-ids.js";
 import { textContentArg } from "../../../runs/turn/tool-text.js";
 import type { FinishedShellCommand } from "../../../sandboxes/shell-command-stream.js";
@@ -30,6 +34,10 @@ import {
   loginFieldLabelsArgument,
   oneTimeCodeArgument,
 } from "../../../secrets/bot-secrets.js";
+import {
+  STEP_STATUS_DESCRIPTION,
+  STEP_STATUS_FIELD,
+} from "../../../step-status.tool-definition.js";
 import { FIND_TOOL, USE_TOOL } from "../../../tools/builtin.tool-definition.js";
 import { findTools, partitionTools } from "../../../tools/builtin-tool-bridge.js";
 import { SCHEDULE_TOOL_NAMES } from "../../../tools/schedule-tools.js";
@@ -47,8 +55,6 @@ import type { RuntimeModelTarget } from "../pi-runtime-models.js";
 import { recordPiTelemetryContent, withPiTelemetrySpan } from "../usage/pi-telemetry.js";
 import { COMPUTER_MODE_TOOLS } from "./pi-runtime-computer-mode.js";
 import { parametersFor, prepareFleetArguments } from "./pi-runtime-tool-parameters.js";
-import { STEP_STATUS_DESCRIPTION, STEP_STATUS_FIELD } from "../../../step-status.tool-definition.js";
-import { narrationStatusLine, openingAcknowledgementEnabled } from "../../../runs/lifecycle/user-progress.js";
 
 export interface ToolCallBudget {
   count: number;

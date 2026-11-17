@@ -168,6 +168,7 @@ export const memoryTools: ToolHandlers = {
     const response = await ctx.memory.semantic!.recall(
       {
         query: String(args.query ?? ""),
+        ...(args.forForget === true ? { forForget: true } : {}),
         scope: ctx.memory.scope!,
         botId: bot.id,
         ...(thread.historyCompactedUpToSeq == null

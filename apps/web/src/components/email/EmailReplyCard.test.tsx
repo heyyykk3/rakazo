@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const emailReply = vi.hoisted(() => vi.fn(async () => ({})));
 
-vi.mock("../lib/rpc", () => {
+vi.mock("../../lib/rpc", () => {
   const rpc = { threads: { emailReply } };
   return { rpc, rpcForSpace: () => rpc, createSpaceRpc: () => rpc, selectedSpaceId: () => null };
 });
@@ -69,9 +69,13 @@ describe("EmailReplyCard", () => {
     opened.push(card);
     expect(card.host.querySelector('[data-testid="email-reply-card"]')).not.toBeNull();
     expect(card.text()).toContain("Mail");
-    expect(card.text()).toContain("ops@mail.example.com");
+    expect(card.host.querySelector<HTMLInputElement>('input[aria-label="From"]')?.value).toBe(
+      "ops@mail.example.com",
+    );
     expect(card.text()).toContain("In reply to");
-    expect(card.text()).toContain("Re: Training enquiry");
+    expect(card.host.querySelector<HTMLInputElement>('input[aria-label="Subject"]')?.value).toBe(
+      "Re: Training enquiry",
+    );
     expect(card.text()).toContain("Send");
     expect(card.text()).toContain("Discard");
   });

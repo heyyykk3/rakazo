@@ -1,11 +1,15 @@
 import * as z from "zod";
 import {
+  EMAIL_SEND_RECIPIENTS_MAX,
+  EMAIL_SEND_SUBJECT_MAX_CHARS,
+  EMAIL_SEND_TEXT_MAX_CHARS,
+} from "./bots/bot-email.js";
+import {
   botSecretDestinationSchema,
   LoginFieldLabels,
   OneTimeCodeTarget,
 } from "./bots/bot-secrets.js";
 import { PAGE_TITLE_MAX_LENGTH } from "./conversations/pages.js";
-import { EMAIL_SEND_RECIPIENTS_MAX, EMAIL_SEND_SUBJECT_MAX_CHARS, EMAIL_SEND_TEXT_MAX_CHARS } from "./bots/bot-email.js";
 import { Id, ThinkingLevelSchema } from "./ids.js";
 import { AgentImportSetupItemSchema } from "./integrations/agent-import-setup.js";
 import { McpTransportSchema } from "./integrations/mcp.js";

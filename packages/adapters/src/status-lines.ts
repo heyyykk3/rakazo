@@ -3,16 +3,16 @@ import type { ModelRoleChoice } from "@rakazo/contracts";
 import { deadlineSignal, redactSecrets, withAbort } from "@rakazo/core";
 import { recordUsage } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
-import type { ExecutorDeps } from "./runs/executor/executor-deps.js";
-import { effectiveModelRole } from "./model-roles.js";
+import { effectiveModelRole } from "./models/model-roles.js";
 import { findConnectedModelCredential } from "./models/model-selection.js";
+import type { ExecutorDeps } from "./runs/executor/executor-deps.js";
+import { narrationStatusLine } from "./runs/lifecycle/user-progress.js";
 import { resolveModelKey } from "./runs/turn/run-model.js";
 import {
   openingStatusPrompt,
   STATUS_LINE_INSTRUCTIONS,
   stepStatusPrompt,
 } from "./status-lines.prompt.js";
-import { narrationStatusLine } from "./runs/lifecycle/user-progress.js";
 
 /** How long a status line may take before the working line moves on without it. */
 const STATUS_LINE_TIMEOUT_MS = 15_000;

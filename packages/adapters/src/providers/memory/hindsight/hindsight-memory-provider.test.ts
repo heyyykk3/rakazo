@@ -142,6 +142,8 @@ function hindsightFake(
       }
       return Response.json({ operation_id: operation[1], status });
     }
+    if (method === "PATCH" && rest.startsWith("/memories/") && body.state === "invalidated")
+      return Response.json({});
     if (method === "POST" && rest === "/memories/recall") {
       const results = options.recall?.[bank];
       if (results === "down") throw new TypeError("fetch failed");
@@ -363,6 +365,36 @@ describe("Hindsight saves", () => {
 
 describe("Hindsight recall", () => {
   const recall = { query: " tea? ", botId: "bot-1", limit: 10 } as const;
+
+  it("forgets only a cited fact in a writable bank and preserves separately cited copies", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const fact = { id, text: "A test preference.", type: "world" };
+    const fake = hindsightFake({
+      recall: { [OWN_BANK]: [fact], [TEAM_BANK]: [fact], imported: [fact] },
+    });
+    const memory = provider(fake.fetch, { recallBanks: ["imported"] });
+    const scope = "shared" as const;
+    const found = await memory.recall({ ...recall, scope, forForget: true }, context);
+    expect(found).toMatchObject({
+      ok: true,
+      value: [
+        { id, entity: OWN_BANK },
+        { id, entity: TEAM_BANK },
+      ],
+    });
+    await expect(
+      memory.forget({ id, botId: "bot-1", scope, entity: "imported" }, context),
+    ).resolves.toMatchObject({ ok: false });
+    await expect(
+      memory.forget({ id, botId: "bot-1", scope: "isolated", entity: TEAM_BANK }, context),
+    ).resolves.toMatchObject({ ok: false });
+    await expect(
+      memory.forget({ id, botId: "bot-1", scope, entity: TEAM_BANK }, context),
+    ).resolves.toMatchObject({ ok: true, value: { id, expired: true } });
+    expect(fake.requests.filter((r) => r.method === "PATCH")).toMatchObject([
+      { bank: TEAM_BANK, rest: `/memories/${id}`, body: { state: "invalidated" } },
+    ]);
+  });
 
   it("keeps imports out of automatic context while allowing explicit recall", async () => {
     const fake = hindsightFake({
@@ -1180,10 +1212,6 @@ describe("Hindsight reflect", () => {
     await expect(
       provider(fake.fetch).reflect({ query: "Drinks?", botId: "bot-1" }, context),
     ).resolves.toEqual({ ok: true, value: "" });
-  });
-
-  it("has no forget", () => {
-    expect("forget" in provider(vi.fn())).toBe(false);
   });
 });
 

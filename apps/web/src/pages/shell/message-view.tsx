@@ -19,7 +19,7 @@ import { AskCard } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
 import { CloudAgentCard } from "../../components/CloudAgentCard";
 import { ComputerCard } from "../../components/ComputerCard";
-import { EmailReplyCard } from "../../components/EmailReplyCard";
+import { EmailReplyCard } from "../../components/email/EmailReplyCard";
 import { McpAppCard } from "../../components/McpAppCard";
 import { PageBlockCard } from "../../components/pages/PageBlockCard";
 import { SubagentCard } from "../../components/SubagentCard";

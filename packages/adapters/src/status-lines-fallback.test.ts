@@ -1,11 +1,11 @@
 import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
+import { effectiveModelRole } from "./models/model-roles.js";
 import type { ExecutorDeps } from "./runs/executor/executor-deps.js";
-import { effectiveModelRole } from "./model-roles.js";
 import { resolveModelKey } from "./runs/turn/run-model.js";
 import { createStatusLineWriter } from "./status-lines.js";
 
-vi.mock("./model-roles.js", () => ({
+vi.mock("./models/model-roles.js", () => ({
   effectiveModelRole: vi.fn(async () => ({
     primary: { provider: "anthropic", modelId: "small-a" },
     backups: [{ provider: "openai", modelId: "small-b" }],

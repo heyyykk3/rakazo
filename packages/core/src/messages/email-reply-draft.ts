@@ -334,8 +334,15 @@ export function emailReplyOutbound(draft: EmailReplyDraft): SentEmail {
   if (!draft.body.trim()) {
     throw new EmailReplyDraftError("Write the message", "EMAIL_REPLY_NO_BODY");
   }
-  if (/\[\s*(?:fill in|insert (?:name|date|amount)|your name here)\s*\]/i.test(draft.subject + "\n" + draft.body)) {
-    throw new EmailReplyDraftError("Replace the unfinished placeholder before sending.", "EMAIL_REPLY_PLACEHOLDER");
+  if (
+    /\[\s*(?:fill in|insert (?:name|date|amount)|your name here)\s*\]/i.test(
+      `${draft.subject}\n${draft.body}`,
+    )
+  ) {
+    throw new EmailReplyDraftError(
+      "Replace the unfinished placeholder before sending.",
+      "EMAIL_REPLY_PLACEHOLDER",
+    );
   }
   return {
     draftId: draft.id,

@@ -11,6 +11,7 @@ import { clearRoutineBackoff } from "../../routines/routine-backoff.js";
 import { connectorStepNames } from "../../runtime/pi/tools/pi-runtime-tools.js";
 import type { RunContext } from "../assembly/run-context.js";
 import { publishMessage, redactBlocks } from "../assembly/run-messages.js";
+import { runPromotesMidTurnNarration } from "../assembly/run-replies.prompt.js";
 import {
   conversationRetentionMessages,
   enqueueConversationRetention,
@@ -25,7 +26,6 @@ import {
   withReplyToolOutcomes,
 } from "../lifecycle/run-progress.js";
 import { applyTool } from "../tools/run-tools.js";
-import { runPromotesMidTurnNarration } from "../assembly/run-replies.prompt.js";
 import type { RuntimeEvent } from "./run-turn.js";
 import {
   appendToolCompletionAudit,

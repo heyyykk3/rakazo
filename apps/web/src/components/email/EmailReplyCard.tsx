@@ -4,10 +4,10 @@ import type { MessageBlock } from "@rakazo/contracts";
 import type { EmailReplyCommitAction } from "@rakazo/core";
 import { Button, OptionSelect, Textarea } from "@rakazo/ui-web";
 import { useRef, useState } from "react";
-import { useSave } from "../lib/query";
-import type { RpcClient } from "../lib/rpc";
-import { errorText } from "../lib/user-error";
-import { BuiCard } from "./ai/primitives";
+import { useSave } from "../../lib/query";
+import type { RpcClient } from "../../lib/rpc";
+import { errorText } from "../../lib/user-error";
+import { BuiCard } from "../ai/primitives";
 
 type EmailReplyBlock = Extract<MessageBlock, { kind: "email_reply" }>;
 type ThreadTarget = { botId: string } | { groupId: string };

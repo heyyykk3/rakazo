@@ -1,7 +1,6 @@
 import { setImmediate } from "node:timers/promises";
 import type { JobPublisher, NotificationProvider } from "@rakazo/adapter-kit";
 import { routineWakeupJob, runContinueJob } from "@rakazo/adapter-kit";
-import type { MessageBlock } from "@rakazo/contracts";
 import {
   BACKGROUND_HELPER_TRIGGER,
   messageBlocksText,

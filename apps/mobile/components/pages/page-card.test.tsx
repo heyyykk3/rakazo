@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { flush } from "@rakazo/core/test-async";
 import type { ReactNode } from "react";
 import { act, createElement, useEffect } from "react";
 import { createRoot } from "react-dom/client";
@@ -130,7 +131,7 @@ it("draws an HTML page whole in the chat instead of the compact preview", async 
     currentVersion: 1,
   };
   const shown = await card();
-  await act(async () => await new Promise((resolve) => setTimeout(resolve, 0)));
+  await act(flush);
   expect(shown.container.querySelector("iframe")).not.toBeNull();
   expect(shown.container.textContent).toContain("Inline");
 
