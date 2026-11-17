@@ -19,7 +19,7 @@ import { CHATGPT_OAUTH_PROVIDER, oauthCredentialAccountId } from "./pi-oauth.js"
  * backend for a newer compatibility view.
  */
 export const CODEX_MODELS_ENDPOINT = "https://chatgpt.com/backend-api/codex/models";
-const CODEX_CLIENT_VERSION = "0.159.3";
+const CODEX_CLIENT_VERSION = "0.169.0";
 
 const CODEX_CATALOG_TIMEOUT_MS = 12_000;
 const CODEX_CATALOG_HARD_DEADLINE_MS = CODEX_CATALOG_TIMEOUT_MS + 10_000;
