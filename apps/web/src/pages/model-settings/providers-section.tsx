@@ -73,7 +73,7 @@ export function ProvidersSection({
                 <span className="shrink-0 text-body-sm text-warning">
                   <Trans>Sign in again</Trans>
                 </span>
-              ) : modelCount ? (
+              ) : modelCount && (group.grouped || group.credentials[0]?.authKind === "oauth") ? (
                 <span className="shrink-0 text-body-sm text-muted-foreground">
                   <Plural
                     value={group.credentials.reduce((sum, entry) => sum + modelCount(entry), 0)}
