@@ -45,6 +45,7 @@ import {
 
 function showToolStep(ctx: RunContext, event: RuntimeEvent<"tool">) {
   const { reply } = ctx.state;
+  if (event.name !== "message_user") reply.nonMessagingToolStarted = true;
   // Queued first so the text written before this call becomes its note.
   const stepNames = connectorStepNames(ctx.tools.connector.get(event.name), event.args);
   const callSteps = stepNames.length > 0 ? stepNames : [event.name];

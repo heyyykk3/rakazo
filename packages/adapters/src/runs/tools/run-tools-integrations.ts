@@ -15,6 +15,7 @@ import { collectLogIds } from "../../providers/integration/composio/composio-con
 import { storeMcpAppHtml } from "../../storage/thread-artifacts.js";
 import { webFetchFromTool, webSearchFromTool } from "../../web/web-tools.js";
 import type { RunContext } from "../assembly/run-context.js";
+import { neverAsks } from "../assembly/run-context.js";
 import { publishMessage } from "../assembly/run-messages.js";
 import { runScopedToolExecutionId } from "../lifecycle/run-effects.js";
 import {
@@ -197,7 +198,11 @@ export const integrationTools: ToolHandlers = {
   async add_mcp_server(ctx, call) {
     const { deps, run, bot } = ctx;
     const { args, executionId } = call;
-    return call.finish(await addMcpServerFromTool(deps, run, bot.id, args, executionId));
+    return call.finish(
+      await addMcpServerFromTool(deps, run, bot.id, args, executionId, {
+        skipApprovals: await neverAsks(ctx),
+      }),
+    );
   },
   async remove_mcp_server(ctx, call) {
     return call.finish(await removeMcpServerFromTool(ctx.deps, ctx.run, call.args));

@@ -221,7 +221,7 @@ describe("narrationStatusLine", () => {
 describe("midTaskMessagePrompt", () => {
   it("asks for a short answer through message_user, then the rest of the task", () => {
     expect(midTaskMessagePrompt("Still working?", true)).toBe(
-      "The person sent this while you were working:\n\nStill working?\n\nIf it asks something or changes the plan, answer briefly with message_user, then continue the task.",
+      "The person sent this while you were working:\n\nStill working?\n\nAnswer it now with message_user in one or two sentences, before any other tool call, even if it is unrelated to the task. Do not fold the answer into your final reply. Then continue the task, adjusting if it changes the plan.",
     );
   });
 

@@ -1,6 +1,6 @@
-import type { AgentRunRequest } from "@rakazo/adapter-kit";
+import type { AdapterContext, AgentRunRequest } from "@rakazo/adapter-kit";
 import { modelRoleConnectionId } from "@rakazo/contracts";
-import { BACKGROUND_HELPER_TRIGGER, redactSecrets } from "@rakazo/core";
+import { BACKGROUND_HELPER_TRIGGER, isConversationalRun, redactSecrets } from "@rakazo/core";
 import { isDatabaseUnavailable, recordUsage } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { isStrategicInitiativeRun } from "../../routines/strategic-initiative.js";
@@ -17,6 +17,8 @@ import {
 } from "../assembly/run-instructions.prompt.js";
 import {
   GROUP_UNADDRESSED_REPLY_GUIDANCE,
+  LONG_REPLY_PAGE_FOLLOW_UP_PROMPT,
+  MISSING_RESULT_FOLLOW_UP_PROMPT,
   runReplyGuidance,
 } from "../assembly/run-replies.prompt.js";
 import type { RunExecutorServices, RunHold } from "../lifecycle/run-attempt.js";
@@ -30,6 +32,8 @@ import { claimRunSteering } from "./run-turn-images.js";
 import { appendToolCompletionAudit, toolCompletionOutcome } from "./tool-completion-audit.js";
 import { toolResultFingerprint } from "./tool-loop.js";
 import { keepToolStepResult } from "./tool-step-calls.js";
+
+const LONG_REPLY_PAGE_GUARD_CHARS = 1_200;
 
 export async function runModelTurn(
   services: RunExecutorServices,
@@ -64,11 +68,17 @@ export async function runModelTurn(
         }),
       )
       .catch((error: unknown) => getLogger().warn("run.prompt_version_failed", { error }));
-    const runtimeEvents = deps.runtime.run(modelTurnRequest(services, hold, turn), {
+    const baseRequest = modelTurnRequest(services, hold, turn);
+    const runtimeContext = {
       ...context,
       signal: AbortSignal.any([context.signal, ctx.runtimeAbortController.signal]),
-    });
+    };
+    const runtimeEvents = deps.runtime.run(baseRequest, runtimeContext);
     if (await consumeRunEvents(ctx, runtimeEvents)) return;
+    if (await interruptedByShutdown()) return;
+    if (await maybeRunResultFollowUp(ctx, baseRequest, runtimeContext)) return;
+    if (await interruptedByShutdown()) return;
+    if (await maybeRunLongReplyPageFollowUp(ctx, turn, baseRequest, runtimeContext)) return;
     if (await interruptedByShutdown()) return;
     await completeRun(ctx);
   } catch (turnError) {
@@ -235,6 +245,8 @@ function modelTurnRequest(
       agentSkillsLine,
       taughtSkillsLine,
       replyGuidance: runReplyGuidance(run.trigger, replyMode),
+      conversational: isConversationalRun(run.trigger) && !allowSilentEmptyRun,
+      reactOffered: tools.some((tool) => tool.name === "react"),
       // These runs get a narrow tool set, so guidance names only the tools they have.
       disabledBuiltinTools:
         isStrategicInitiativeRun(run) || run.trigger === BACKGROUND_HELPER_TRIGGER
@@ -392,4 +404,140 @@ function modelTurnRequest(
         },
       ),
   };
+}
+
+/**
+ * When a conversational turn ends after tool steps with no final text (only an opening heads-up
+ * or nothing at all), ask the model once to write the actual result instead of falling back to
+ * "done.".
+ */
+async function maybeRunResultFollowUp(
+  ctx: AssembledTurn["ctx"],
+  baseRequest: AgentRunRequest,
+  runtimeContext: AdapterContext,
+): Promise<boolean> {
+  const { deps, run } = ctx;
+  const { reply } = ctx.state;
+  const hasSubstantiveMidTurn = reply.publishedMidTurnUserMessage && !reply.openingAckOnly;
+  if (
+    ctx.scripted ||
+    !isConversationalRun(run.trigger) ||
+    ctx.allowSilentEmptyRun ||
+    ctx.groupReplyOptional ||
+    ctx.state.handedOff ||
+    ctx.state.approval.pausePending ||
+    !ctx.state.lease.valid ||
+    reply.publishedTerminalSubagent ||
+    reply.explicitNoResponse ||
+    reply.toolOutcomes.size === 0 ||
+    reply.assembled.trim() ||
+    reply.workingNotes.length > 0 ||
+    reply.lastDiscardedMidTurnNarration ||
+    hasSubstantiveMidTurn
+  ) {
+    return false;
+  }
+  const followUpRequest: AgentRunRequest = {
+    ...baseRequest,
+    prompt: MISSING_RESULT_FOLLOW_UP_PROMPT,
+    tools: [],
+    turnCheckpoint: undefined,
+    resumeFromCheckpoint: undefined,
+    history: [
+      ...baseRequest.history,
+      {
+        role: "user",
+        content: baseRequest.prompt,
+        ...(baseRequest.promptSpeaker ? { speaker: baseRequest.promptSpeaker } : {}),
+      },
+      {
+        role: "assistant",
+        content: reply.midTurnUserTexts.join("\n\n"),
+        ...(reply.transcript ? { transcript: reply.transcript } : {}),
+      },
+    ],
+  };
+  return consumeRunEvents(ctx, deps.runtime.run(followUpRequest, runtimeContext));
+}
+
+/**
+ * When a conversational turn produces a long wall of text and save_page was offered (and not yet
+ * used), give the model one step to move the detail into a Page and reply in one short sentence.
+ */
+async function maybeRunLongReplyPageFollowUp(
+  ctx: AssembledTurn["ctx"],
+  turn: AssembledTurn,
+  baseRequest: AgentRunRequest,
+  runtimeContext: AdapterContext,
+): Promise<boolean> {
+  const { deps, run, runId } = ctx;
+  const { reply } = ctx.state;
+  const draftText = reply.assembled.trim();
+  const savePageTools = turn.tools.tools.filter((tool) => tool.name === "save_page");
+  if (
+    ctx.scripted ||
+    !isConversationalRun(run.trigger) ||
+    ctx.allowSilentEmptyRun ||
+    ctx.state.handedOff ||
+    ctx.state.approval.pausePending ||
+    !ctx.state.lease.valid ||
+    reply.explicitNoResponse ||
+    savePageTools.length === 0 ||
+    reply.toolCalls.some((call) => call.tool === "save_page") ||
+    draftText.length <= LONG_REPLY_PAGE_GUARD_CHARS
+  ) {
+    return false;
+  }
+  getLogger().info("run.long_reply_page_guard", {
+    "run.id": runId,
+    "reply.chars": draftText.length,
+  });
+  const saved = {
+    assembled: reply.assembled,
+    currentTextSegment: reply.currentTextSegment,
+    messageSegments: [...reply.messageSegments],
+    hasStreamedText: reply.hasStreamedText,
+    pendingProgress: reply.pendingProgress,
+    textSinceLastStep: reply.textSinceLastStep,
+    transcript: reply.transcript,
+  };
+  reply.assembled = "";
+  reply.currentTextSegment = "";
+  reply.messageSegments = reply.messageSegments.filter((block) => block.kind !== "text");
+  reply.hasStreamedText = false;
+  reply.pendingProgress = "";
+  reply.textSinceLastStep = "";
+  const followUpRequest: AgentRunRequest = {
+    ...baseRequest,
+    prompt: LONG_REPLY_PAGE_FOLLOW_UP_PROMPT,
+    tools: savePageTools,
+    turnCheckpoint: undefined,
+    resumeFromCheckpoint: undefined,
+    history: [
+      ...baseRequest.history,
+      {
+        role: "user",
+        content: baseRequest.prompt,
+        ...(baseRequest.promptSpeaker ? { speaker: baseRequest.promptSpeaker } : {}),
+      },
+      {
+        role: "assistant",
+        content: draftText,
+        ...(saved.transcript ? { transcript: saved.transcript } : {}),
+      },
+    ],
+  };
+  const stopped = await consumeRunEvents(ctx, deps.runtime.run(followUpRequest, runtimeContext));
+  if (stopped) return true;
+  // Never drop the original answer if the follow-up failed to save a page or write a short reply.
+  if (!reply.assembled.trim() && !reply.toolCalls.some((call) => call.tool === "save_page")) {
+    reply.assembled = saved.assembled;
+    reply.currentTextSegment = saved.currentTextSegment;
+    reply.messageSegments = saved.messageSegments;
+    reply.hasStreamedText = saved.hasStreamedText;
+    reply.pendingProgress = saved.pendingProgress;
+    reply.textSinceLastStep = saved.textSinceLastStep;
+    reply.transcript = saved.transcript;
+  }
+  return false;
 }

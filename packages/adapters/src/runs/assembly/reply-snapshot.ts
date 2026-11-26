@@ -34,6 +34,8 @@ const ReplySnapshotSchema = z.object({
   steeringResets: z.number().optional(),
   lastSteeringResetAt: z.number().optional(),
   turnStartedAtMs: z.number().optional(),
+  openingAckOnly: z.boolean().optional(),
+  nonMessagingToolStarted: z.boolean().optional(),
 });
 export type ReplySnapshot = z.infer<typeof ReplySnapshotSchema>;
 
@@ -78,6 +80,8 @@ export function snapshotReply(reply: ReplyState): ReplySnapshot {
       lastSteeringResetAt: reply.lastSteeringResetAt,
     }),
     turnStartedAtMs: reply.turnStartedAtMs,
+    openingAckOnly: reply.openingAckOnly,
+    nonMessagingToolStarted: reply.nonMessagingToolStarted,
   };
 }
 

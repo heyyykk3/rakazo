@@ -104,6 +104,10 @@ export interface ReplyState {
    * still knows progress was already published (skip hollow finals; status outcome).
    */
   publishedMidTurnUserMessage: boolean;
+  /** True when the only mid-turn message published so far was the opening acknowledgement. */
+  openingAckOnly: boolean;
+  /** True once any tool other than message_user has started in this run. */
+  nonMessagingToolStarted: boolean;
   /**
    * Some runs hold back pre-tool narration instead of posting it as chat.
    * Keep the last segment in case the model supplies no final reply.

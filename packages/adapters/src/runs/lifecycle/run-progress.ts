@@ -52,6 +52,8 @@ export async function createReplyState(
     messageSegments: [],
     publishedTerminalSubagent: false,
     publishedMidTurnUserMessage: false,
+    openingAckOnly: false,
+    nonMessagingToolStarted: false,
     discardedMidTurnNarration: false,
     lastDiscardedMidTurnNarration: "",
     explicitNoResponse: false,
@@ -118,6 +120,22 @@ export function noteComputerTaskStep(reply: ReplyState, toolName: string) {
 }
 
 /**
+ * The opening acknowledgement via message_user before the first tool call of a conversational run
+ * may post immediately so the person sees what the bot is starting on. Later progress updates
+ * keep the 60-second gate.
+ */
+export function canPostOpeningAcknowledgement(ctx: RunContext): boolean {
+  const { reply } = ctx.state;
+  return (
+    reply.midTurnProgressCount === 0 &&
+    !reply.nonMessagingToolStarted &&
+    isConversationalRun(ctx.run.trigger) &&
+    !runAllowsSilentEmpty(ctx.run.trigger) &&
+    !ctx.allowSilentEmptyRun
+  );
+}
+
+/**
  * Browser and desktop tasks often take minutes, so the run's first interim message may tell
  * the person so at once. Runs nobody is waiting on keep the fresh-turn rule.
  */
@@ -146,9 +164,15 @@ function nextProgressNonce(ctx: RunContext) {
  * Posts an interim message. A chat app gets a run's messages when the run ends, so a 1:1 run it
  * started sends this one on at once. A group run posts once, when it ends.
  */
-export async function publishInterimMessage(ctx: RunContext, text: string, markUnread?: boolean) {
+export async function publishInterimMessage(
+  ctx: RunContext,
+  text: string,
+  markUnread?: boolean,
+  options?: { openingAck?: boolean },
+) {
   const { deps, run } = ctx;
   const { reply } = ctx.state;
+  const isFirstOpeningAck = Boolean(options?.openingAck) && reply.midTurnProgressCount === 0;
   await publishMessage(
     deps,
     run,
@@ -159,6 +183,7 @@ export async function publishInterimMessage(ctx: RunContext, text: string, markU
   );
   reply.midTurnUserTexts.push(text);
   reply.publishedMidTurnUserMessage = true;
+  reply.openingAckOnly = isFirstOpeningAck;
   // Text held back earlier is older than what the person now has, so it is no reply.
   reply.lastDiscardedMidTurnNarration = "";
   if (run.trigger === "messaging" && !ctx.source.channelId) {

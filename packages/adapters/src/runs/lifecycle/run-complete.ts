@@ -312,23 +312,24 @@ async function finalReply(ctx: RunContext) {
           !reply.publishedMidTurnUserMessage
         ? peerReplyWithoutSentinel(reply.assembled, reply.messageSegments)
         : stripStrayNoResponse(reply.assembled, reply.messageSegments);
+  const hasSubstantiveMidTurn = reply.publishedMidTurnUserMessage && !reply.openingAckOnly;
   let completionBlocks = silentReply.blocks;
   if (!silentReply.assembled || isBackgroundRunTrigger(run.trigger)) {
-    // Mid-turn progress already posted durable chat messages; skip the empty
-    // "…" fallback so we do not add a junk final bubble.
+    // Substantive mid-turn progress already posted durable chat messages; skip the empty
+    // fallback so we do not add a junk final bubble. An opening acknowledgement alone is not
+    // the result.
     completionBlocks = completionMessageSegments(completionBlocks, {
-      allowSilentEmpty:
-        ctx.allowSilentEmptyRun || reply.publishedMidTurnUserMessage || groupSilentEnd,
+      allowSilentEmpty: ctx.allowSilentEmptyRun || hasSubstantiveMidTurn || groupSilentEnd,
       emptyResponseText: ctx.emptyResponseText,
       suppressOutput: ctx.state.handedOff || isBackgroundRunTrigger(run.trigger),
-      skipEmptyFallback: reply.publishedTerminalSubagent || reply.publishedMidTurnUserMessage,
+      skipEmptyFallback: reply.publishedTerminalSubagent || hasSubstantiveMidTurn,
     });
   }
   const blocks = ctx.state.handedOff
     ? []
     : finalBlocksAfterMidTurnProgress(
         redactBlocks(completionBlocks, ctx.secrets),
-        reply.publishedMidTurnUserMessage || runAllowsSilentEmpty(run.trigger),
+        hasSubstantiveMidTurn || runAllowsSilentEmpty(run.trigger),
       );
   const text = ctx.state.handedOff
     ? ""

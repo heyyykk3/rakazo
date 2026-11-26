@@ -1,4 +1,4 @@
-import { QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
+import { PERSON_RUN_TRIGGERS, QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
 import type { Prisma } from "@rakazo/db";
 import { HOLDS_CHAT, handQueuedRunToWorkingRun } from "@rakazo/db";
 import { bestEffort, getLogger } from "@rakazo/logging";
@@ -56,6 +56,11 @@ function busyRunWhere(
     OR: [
       { startedAt: { not: null } },
       { status: { not: "queued" } },
+      // A person waiting for a reply always goes ahead of queued routines and bot messages.
+      {
+        trigger: { in: [...PERSON_RUN_TRIGGERS] },
+        AND: [{ OR: [{ wakeAt: null }, { wakeAt: { lte: now } }] }],
+      },
       {
         OR: [
           { createdAt: { lt: run.createdAt } },

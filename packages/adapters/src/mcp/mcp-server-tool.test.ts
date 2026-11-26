@@ -115,6 +115,54 @@ describe("addMcpServerFromTool", () => {
     );
     expect(result).toEqual({ error: "Put token in a header instead of the server URL" });
   });
+  it("auto-connects a non-OAuth server directly when skipApprovals is enabled", async () => {
+    const botMcpCreate = vi.fn(async () => ({ id: "assign-1" }));
+    const mcpCreate = vi.fn(async () => ({ id: "srv-1", name: "Linear" }));
+    const secretCreate = vi.fn(async () => ({ id: "sec-1" }));
+    const deps = {
+      mcpAllowPrivateEndpoint: true,
+      prisma: {
+        space: { findUnique: vi.fn(async () => ({ organizationId: null })) },
+        mcpServer: { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []) },
+        $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({
+            secret: { create: secretCreate },
+            mcpServer: { create: mcpCreate },
+            botMcpServer: { create: botMcpCreate },
+          }),
+      },
+      secretStore: {
+        put: vi.fn(async () => ({ id: "sec-1", ciphertext: "enc" })),
+      },
+      secretHttp: {
+        resolveHostname: vi.fn(async () => [{ address: "93.184.216.34", family: 4 as const }]),
+      },
+      events: { notify: vi.fn(async () => undefined) },
+    } as unknown as ExecutorDeps;
+    const result = await addMcpServerFromTool(
+      deps,
+      { id: "run-1", spaceId: "space-1", userId: "user-1", threadId: "t-1", botId: "b-1" },
+      "b-1",
+      {
+        name: "Linear",
+        transport: "streamable_http",
+        endpoint: "https://mcp.linear.example/mcp",
+        headers: { Authorization: "Bearer test-token" },
+      },
+      "exec-1",
+      { skipApprovals: true },
+    );
+    expect(result).toMatchObject({ ok: true, server_id: "srv-1", connected: true });
+    expect(botMcpCreate).toHaveBeenCalledWith({
+      data: {
+        spaceId: "space-1",
+        userId: "user-1",
+        botId: "b-1",
+        serverId: "srv-1",
+        allowAllTools: true,
+      },
+    });
+  });
 });
 
 describe("removeMcpServerFromTool", () => {

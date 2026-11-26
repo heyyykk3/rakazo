@@ -10,6 +10,7 @@ import type {
   RealtimeFanout,
 } from "@rakazo/adapter-kit";
 import { dispatchBackgroundJob } from "@rakazo/adapter-kit";
+import { PERSON_RUN_TRIGGERS } from "@rakazo/core";
 import type { DatabaseOutage, Prisma, PrismaClient } from "@rakazo/db";
 import {
   databaseOutage,
@@ -479,7 +480,16 @@ export class RunWorkerHost implements JobWorkerHost {
         if (ended) this.wake();
       }
     }
-    for (const row of runnable) {
+    // People waiting for a reply start before queued bot messages and webhooks.
+    const personTriggers = new Set<string>(PERSON_RUN_TRIGGERS);
+    const ordered =
+      lane === "interactive"
+        ? [
+            ...runnable.filter((row) => personTriggers.has(row.trigger)),
+            ...runnable.filter((row) => !personTriggers.has(row.trigger)),
+          ]
+        : runnable;
+    for (const row of ordered) {
       if (this.stopping) break;
       this.starter.take(row.id);
     }

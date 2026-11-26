@@ -24,6 +24,7 @@ import { startBackgroundHelper } from "../../tasks/background-helpers.js";
 import type { RunContext } from "../assembly/run-context.js";
 import {
   canPostLongTaskHeadsUp,
+  canPostOpeningAcknowledgement,
   canPublishDurableProgress,
   flushProgress,
   publishInterimMessage,
@@ -304,18 +305,26 @@ export const messagingTools: ToolHandlers = {
     const repeat = !reply.steeringReplyPending && reply.midTurnUserTexts.at(-1) === text;
     // An update that can't be a chat message yet is shown as the working line, so the bot has
     // nothing to resend. As the bot's latest word, it becomes the reply if the bot writes none.
+    const openingAck = canPostOpeningAcknowledgement(ctx);
+    const durableProgress = canPublishDurableProgress(reply);
+    const longTaskHeadsUp = canPostLongTaskHeadsUp(ctx);
     if (
       !repeat &&
       ctx.replyMode === "chat" &&
-      !canPublishDurableProgress(reply) &&
-      !canPostLongTaskHeadsUp(ctx)
+      !durableProgress &&
+      !longTaskHeadsUp &&
+      !openingAck
     ) {
       reply.workingNotes.length = 0;
       reply.lastDiscardedMidTurnNarration = text;
       await showNarrationStatus(ctx, text);
       return call.finish(result);
     }
-    if (!repeat) await publishInterimMessage(ctx, text, true);
+    if (!repeat) {
+      await publishInterimMessage(ctx, text, true, {
+        openingAck: openingAck && !durableProgress && !longTaskHeadsUp,
+      });
+    }
     // The person already has this message; notes written before it are no longer a missing answer.
     if (ctx.replyMode === "messages") {
       reply.workingNotes.length = 0;

@@ -132,6 +132,7 @@ export async function addMcpServerFromTool(
   botId: string,
   args: Record<string, unknown>,
   executionId: string,
+  options?: { skipApprovals?: boolean },
 ) {
   // A local server runs on the deployment's own hosts, so only an admin adds one.
   if (args.transport === "stdio") {
@@ -207,7 +208,19 @@ export async function addMcpServerFromTool(
           enabled: true,
         },
       });
-      if (!parsed.assignToSelf) return { server };
+      if (!parsed.assignToSelf) return { server, autoConnected: false };
+      if (options?.skipApprovals && !oauthLikely) {
+        await tx.botMcpServer.create({
+          data: {
+            spaceId: run.spaceId,
+            userId: run.userId,
+            botId,
+            serverId: server.id,
+            allowAllTools: true,
+          },
+        });
+        return { server, autoConnected: true };
+      }
       const blocks: MessageBlock[] = [
         {
           kind: "mcp_approval",
@@ -231,6 +244,7 @@ export async function addMcpServerFromTool(
       );
       return {
         server,
+        autoConnected: false,
         eventSeq: committed.eventSeq,
         firstResponseRunId: committed.firstResponseRunId,
       };
@@ -238,6 +252,14 @@ export async function addMcpServerFromTool(
     serverRow = created.server;
     approvalEventSeq = created.eventSeq;
     approvalResponseRunId = created.firstResponseRunId;
+    if (created.autoConnected) {
+      return {
+        ok: true,
+        server_id: serverRow.id,
+        connected: true,
+        next_step: "The server was registered and connected to this bot.",
+      };
+    }
   } catch (error) {
     if (isUniqueViolation(error)) {
       return {

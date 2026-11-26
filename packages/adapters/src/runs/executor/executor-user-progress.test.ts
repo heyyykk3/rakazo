@@ -817,12 +817,16 @@ describe("notes that can't be posted as messages", () => {
       startedAt,
       steerAt = -1,
       final = "Done.",
-    }: { startedAt?: Date; steerAt?: number; final?: string } = {},
+      afterTool = false,
+    }: { startedAt?: Date; steerAt?: number; final?: string; afterTool?: boolean } = {},
   ) => {
     const results: unknown[] = [];
     const { messages, append, finalizeRun } = await runTurn("", false, undefined, [], "fyi", {
       startedAt,
       runtime: async function* (request) {
+        if (afterTool) {
+          yield { type: "tool", name: "read_file", args: {}, executionId: "call-pre" };
+        }
         for (const [index, message] of updates.entries()) {
           const executionId = `call-${index}`;
           if (index === steerAt) yield { type: "steered", fromRunUser: true };
@@ -839,8 +843,81 @@ describe("notes that can't be posted as messages", () => {
     return { results, sent: sentTexts(messages), statuses, reply: finalText(finalizeRun) };
   };
 
+  it("posts the opening message_user immediately before any tool, then holds later fresh-turn updates as the working line", async () => {
+    expect(await updateTurn(["Checking your calendar.", "Still checking."])).toEqual({
+      results: [{ ok: true }, { ok: true }],
+      sent: ["Checking your calendar."],
+      statuses: ["Still checking."],
+      reply: "Done.",
+    });
+  });
+
+  it("asks the model for the final result instead of ending on done after tool steps with only an opening ack", async () => {
+    let calls = 0;
+    const { messages, finalizeRun } = await runTurn("", false, undefined, [], "fyi", {
+      runtime: async function* (request) {
+        calls += 1;
+        if (calls === 1) {
+          yield {
+            type: "tool",
+            name: "message_user",
+            args: { message: "Checking your calendar." },
+            executionId: "call-0",
+          };
+          await request.executeTool!(
+            "message_user",
+            { message: "Checking your calendar." },
+            "call-0",
+          );
+          yield { type: "tool", name: "read_file", args: {}, executionId: "call-1" };
+          await request.onToolCompleted?.({
+            name: "read_file",
+            executionId: "call-1",
+            durationMs: 5,
+            result: { ok: true },
+          });
+          yield { type: "done", text: "" };
+          return;
+        }
+        expect(request.prompt).toContain("Write the result for the person now");
+        yield { type: "text", text: "You are free Friday afternoon." };
+        yield { type: "done", text: "You are free Friday afternoon." };
+      },
+    });
+    expect(calls).toBe(2);
+    expect(sentTexts(messages)).toEqual(["Checking your calendar."]);
+    expect(finalText(finalizeRun)).toBe("You are free Friday afternoon.");
+  });
+
+  it("asks the model to move an overly long conversational reply into a page when save_page is offered", async () => {
+    let calls = 0;
+    const longDraft = `Detailed report: ${"Important metric row with extra context. ".repeat(40)}`;
+    const { finalizeRun } = await runTurn("", false, undefined, [], "fyi", {
+      runtime: async function* (request) {
+        calls += 1;
+        if (calls === 1) {
+          yield { type: "text", text: longDraft };
+          yield { type: "done", text: longDraft };
+          return;
+        }
+        expect(request.prompt).toContain("Move the detail into a page with save_page");
+        expect(request.tools.map((tool) => tool.name)).toEqual(["save_page"]);
+        yield {
+          type: "tool",
+          name: "save_page",
+          args: { title: "Report" },
+          executionId: "call-p1",
+        };
+        yield { type: "text", text: "Saved your report in the Report page." };
+        yield { type: "done", text: "Saved your report in the Report page." };
+      },
+    });
+    expect(calls).toBe(2);
+    expect(finalText(finalizeRun)).toBe("Saved your report in the Report page.");
+  });
+
   it("shows a message_user update it can't post as the working line, with nothing to retry", async () => {
-    expect(await updateTurn(["On it, checking now."])).toEqual({
+    expect(await updateTurn(["On it, checking now."], { afterTool: true })).toEqual({
       results: [{ ok: true }],
       sent: [],
       statuses: ["On it, checking now."],
@@ -864,7 +941,7 @@ describe("notes that can't be posted as messages", () => {
   });
 
   it("replies with an update it couldn't post when the bot writes nothing after it", async () => {
-    expect(await updateTurn(["The total is 4."], { final: "" })).toMatchObject({
+    expect(await updateTurn(["The total is 4."], { final: "", afterTool: true })).toMatchObject({
       sent: [],
       reply: "The total is 4.",
     });
@@ -873,6 +950,7 @@ describe("notes that can't be posted as messages", () => {
   it("prefers that update over a note written before it", async () => {
     const { finalizeRun } = await runTurn("", false, undefined, [], "fyi", {
       runtime: async function* (request) {
+        yield { type: "tool", name: "read_file", args: {}, executionId: "call-0" };
         yield { type: "text", text: "Looking it up." };
         yield { type: "tool", name: "message_user", args: {}, executionId: "call-1" };
         await request.executeTool!("message_user", { message: "The total is 4." }, "call-1");
@@ -885,7 +963,11 @@ describe("notes that can't be posted as messages", () => {
 
   it("does not reply with an update it couldn't post once a later one was posted", async () => {
     expect(
-      await updateTurn(["Starting.", "The total is 4."], { steerAt: 1, final: "" }),
+      await updateTurn(["Starting.", "The total is 4."], {
+        steerAt: 1,
+        final: "",
+        afterTool: true,
+      }),
     ).toMatchObject({ sent: ["The total is 4."], reply: "" });
   });
 
@@ -931,7 +1013,7 @@ describe("notes that can't be posted as messages", () => {
   it("still says when an update was cut off, whether it was posted or shown as the working line", async () => {
     const long = `Checking ${"every invoice ".repeat(60)}`.trim();
     const cutOff = { ok: true, truncated: true, note: expect.stringContaining("cut off") };
-    const fresh = await updateTurn([long]);
+    const fresh = await updateTurn([long], { afterTool: true });
     expect(fresh.results).toEqual([cutOff]);
     expect(fresh.sent).toEqual([]);
     const posted = await updateTurn([long], { startedAt: new Date(Date.now() - 120_000) });
@@ -1382,22 +1464,23 @@ describe("a message from the person while the bot works", () => {
     const answer = async (steered: boolean) =>
       (
         await runTurn("", false, undefined, [], "fyi", {
-          executeTools: true,
-          runtimeEvents: [
-            ...(steered ? [{ type: "steered" as const, fromRunUser: true }] : []),
-            {
+          runtime: async function* (request) {
+            yield { type: "tool", name: "read_file", args: {}, executionId: "call-0" };
+            if (steered) yield { type: "steered", fromRunUser: true };
+            yield {
               type: "tool",
               name: "message_user",
               args: { message: "Yes, still on it." },
               executionId: "call-1",
-            },
-            { type: "text", text: "All four checked." },
-            { type: "done", text: "" },
-          ],
+            };
+            await request.executeTool!("message_user", { message: "Yes, still on it." }, "call-1");
+            yield { type: "text", text: "All four checked." };
+            yield { type: "done", text: "" };
+          },
         })
       ).messages;
     expect(sentTexts(await answer(true))).toEqual(["Yes, still on it."]);
-    // Without the person's message the turn is too fresh for an interim message.
+    // Without the person's message the turn is too fresh for a post-tool interim message.
     expect(sentTexts(await answer(false))).toEqual([]);
   });
 

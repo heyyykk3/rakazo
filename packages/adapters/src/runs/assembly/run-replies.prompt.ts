@@ -8,7 +8,45 @@ import { messageUserMaxLength } from "../lifecycle/user-progress.js";
 import { NO_RESPONSE } from "./silent-reply.js";
 
 export function longWorkProgressGuidance(maxLength = messageUserMaxLength()): string {
-  return `Send progress updates only when the work will take minutes — long computer tasks or multi-step jobs — never for quick replies and never to announce that you are starting. The one exception: once you are working in a browser or on a desktop on a task that will take a few minutes, tell the person right away with message_user that it will take a while. Even then send at most a few brief updates (a sentence or two each), not one per tool call, and do not narrate routine steps. Thinking stays private. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
+  return `Before your first tool call, call message_user with one short sentence saying what you will do first, such as "Checking your calendar for Friday." If you can answer from what you already know, answer directly instead. After that, send progress updates only when the work will take minutes (long computer tasks or multi-step jobs), at most a few brief updates at real milestones, never one per tool call and never narrating routine steps. Thinking stays private. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it: never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
+}
+
+export const REPLY_SHAPE_GUIDANCE =
+  "Keep a chat reply to one or two short sentences when you can, and under about 80 words. Lead with the answer. When the answer is longer than that (more than five list items, a comparison, a report, a briefing or a plan), build a page with save_page and reply with one sentence saying what it shows. Send charts with render_plot and files or pictures with attach_file instead of describing them. Call ask_user only when the person genuinely must pick between distinct options, never for routine confirmation of work they already asked for.";
+
+export const MISSING_RESULT_FOLLOW_UP_PROMPT =
+  "Write the result for the person now, in one to three short sentences.";
+
+export const LONG_REPLY_PAGE_FOLLOW_UP_PROMPT =
+  "This reply is long. Move the detail into a page with save_page and reply in one short sentence saying what the page shows.";
+
+export function replyShapeGuidanceForOfferedTools(
+  disabled?: ReadonlySet<string>,
+  options?: { reactOffered?: boolean },
+): string {
+  const parts = [
+    "Keep a chat reply to one or two short sentences when you can, and under about 80 words. Lead with the answer.",
+  ];
+  if (!disabled?.has("save_page")) {
+    parts.push(
+      "When the answer is longer than that (more than five list items, a comparison, a report, a briefing or a plan), build a page with save_page and reply with one sentence saying what it shows.",
+    );
+  }
+  const media: string[] = [];
+  if (!disabled?.has("render_plot")) media.push("charts with render_plot");
+  if (!disabled?.has("attach_file")) media.push("files or pictures with attach_file");
+  if (media.length > 0) {
+    parts.push(`Send ${media.join(" and ")} instead of describing them.`);
+  }
+  if (!disabled?.has("ask_user")) {
+    parts.push(
+      "Call ask_user only when the person genuinely must pick between distinct options, never for routine confirmation of work they already asked for.",
+    );
+  }
+  if (options?.reactOffered && !disabled?.has("react")) {
+    parts.push("For a simple thanks or OK, use react instead of posting a filler reply.");
+  }
+  return parts.join(" ");
 }
 
 export function messagesModeReplyGuidance(maxLength = messageUserMaxLength()): string {
@@ -146,7 +184,7 @@ export function completionMessageSegments(
  */
 export function midTaskMessagePrompt(text: string, canMessageUser: boolean): string {
   const next = canMessageUser
-    ? "If it asks something or changes the plan, answer briefly with message_user, then continue the task."
+    ? "Answer it now with message_user in one or two sentences, before any other tool call, even if it is unrelated to the task. Do not fold the answer into your final reply. Then continue the task, adjusting if it changes the plan."
     : "Take it into account and continue the task.";
   return `The person sent this while you were working:\n\n${text}\n\n${next}`;
 }
