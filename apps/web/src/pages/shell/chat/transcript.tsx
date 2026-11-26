@@ -120,6 +120,7 @@ export const Transcript = memo(function Transcript({
   onReleaseComputer,
   onOpenImportSetup,
   onOpenAgentImport,
+  onSendStarter,
   rpc,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -180,6 +181,7 @@ export const Transcript = memo(function Transcript({
   ) => Promise<void>;
   onOpenImportSetup?: (target: ImportSetupTarget) => void;
   onOpenAgentImport?: () => void;
+  onSendStarter?: (text: string) => void;
   rpc: ReturnType<typeof createSpaceRpc>;
 }) {
   const { t } = useLingui();
@@ -698,6 +700,35 @@ export const Transcript = memo(function Transcript({
               {loadingOlder ? <Spinner aria-label={t`Loading…`} /> : null}
               {t`Load earlier messages`}
             </Button>
+          ) : null}
+          {shownItems.length === 0 &&
+          !running &&
+          !loadingOlder &&
+          olderCursor == null &&
+          onSendStarter ? (
+            <div
+              data-testid="empty-chat-starters"
+              className="m-auto flex max-w-lg flex-col items-center gap-3 px-4 py-10 text-center"
+            >
+              <p className="text-body-sm text-muted-foreground">{t`Try asking`}</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  t`What can you help me with?`,
+                  t`Summarize what needs my attention today`,
+                  t`Set up a daily morning briefing routine`,
+                  t`Check my schedule and upcoming tasks`,
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => onSendStarter(prompt)}
+                    className="rounded-full border border-border bg-card px-3.5 py-1.5 text-body-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : null}
           {shownItems.map((item) => {
             if (item.kind === "voiceChat") {

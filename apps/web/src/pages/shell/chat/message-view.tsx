@@ -12,6 +12,7 @@ import type {
 import { consecutiveImageRun } from "@rakazo/contracts";
 import type { ChildBotBlock, PeerExchange } from "@rakazo/core";
 import { isPeerReceiptBlocks, isToolActivityBlock, otherAuthor } from "@rakazo/core";
+import { bestEffort } from "@rakazo/logging/best-effort";
 import { BotAvatar, cn, resolvePersonaColorDef } from "@rakazo/ui-web";
 import { UserRound } from "lucide-react";
 import type { ReactNode } from "react";
@@ -65,18 +66,34 @@ import { RoutineEventRow } from "./routine-event-row";
 const LONG_BOT_TEXT_CHARS = 1_200;
 const LONG_BOT_TEXT_LINES = 20;
 
+function derivePageTitle(markdown: string, fallback: string): string {
+  const firstLine = markdown
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^#+\s*/, "")
+        .replace(/[*_`]/g, "")
+        .trim(),
+    )
+    .find(Boolean);
+  if (!firstLine) return fallback;
+  return firstLine.length > 72 ? `${firstLine.slice(0, 71).trimEnd()}…` : firstLine;
+}
+
 function BotTextBubble({
   text,
   isLive,
   quoteMessageId,
   renderMention,
   openPage,
+  onOpenAsPage,
 }: {
   text: string;
   isLive: boolean;
   quoteMessageId?: string;
   renderMention?: (botId: string, label: string) => ReactNode;
   openPage?: (pageId: string) => void;
+  onOpenAsPage?: (markdown: string) => void;
 }) {
   const isLong =
     !isLive && (text.length > LONG_BOT_TEXT_CHARS || text.split("\n").length > LONG_BOT_TEXT_LINES);
@@ -102,7 +119,16 @@ function BotTextBubble({
         ) : null}
       </div>
       {isLong ? (
-        <div className="mt-2 flex justify-end border-t border-border/50 pt-1.5">
+        <div className="mt-2 flex items-center justify-end gap-3 border-t border-border/50 pt-1.5">
+          {onOpenAsPage ? (
+            <button
+              type="button"
+              onClick={() => onOpenAsPage(text)}
+              className="text-caption font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <Trans>Open as Page</Trans>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setCollapsed((prev) => !prev)}
@@ -314,6 +340,37 @@ export const MessageView = memo(function MessageView({
     textAnchorIndex === -1
       ? message.blocks.findIndex((block) => block.kind === "ask")
       : textAnchorIndex;
+  const canCreatePage =
+    typeof (rpc.pages as { create?: unknown } | undefined)?.create === "function";
+  const openTextAsPage = useCallback(
+    (markdown: string) => {
+      if (!canCreatePage) return;
+      const trimmed = markdown.trim();
+      if (!trimmed) return;
+      void bestEffort(
+        "open message as page",
+        rpc.pages
+          .create({
+            ...artifactTarget,
+            title: derivePageTitle(trimmed, t`Saved reply`),
+            markdown: trimmed,
+          })
+          .then((created) => openPage(created.id)),
+      );
+    },
+    [artifactTarget, canCreatePage, openPage, rpc, t],
+  );
+  const fullBotText = useMemo(
+    () =>
+      message.role === "bot"
+        ? message.blocks
+            .filter((b): b is Extract<typeof b, { kind: "text" }> => b.kind === "text")
+            .map((b) => b.text)
+            .join("\n\n")
+            .trim()
+        : "",
+    [message.blocks, message.role],
+  );
   const peerReceipt = isPeerReceiptBlocks(message.blocks);
   const hoverActions = peerReceipt ? null : (
     <MessageHoverActions
@@ -324,6 +381,9 @@ export const MessageView = memo(function MessageView({
       onMarkUnread={onMarkUnread}
       markedUnread={markedUnread}
       onReact={onReact}
+      onOpenAsPage={
+        !isLive && fullBotText && canCreatePage ? () => openTextAsPage(fullBotText) : undefined
+      }
       speech={
         voiceReady && !isLive && hasText && message.role !== "user"
           ? { speaking, disabled: callHoldsSpeaker && !speaking, onSpeak: () => onSpeak(message) }
@@ -699,6 +759,7 @@ export const MessageView = memo(function MessageView({
                   quoteMessageId={quoteMessageId}
                   renderMention={renderMention}
                   openPage={openPage}
+                  onOpenAsPage={canCreatePage ? openTextAsPage : undefined}
                 />
                 {i === hoverAnchorIndex ? hoverActions : null}
               </div>

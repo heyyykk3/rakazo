@@ -156,6 +156,17 @@ describe("Pi choice asks", () => {
     expect(events.some((event) => event.type === "ask")).toBe(false);
   });
 
+  it("accepts up to six choices", async () => {
+    fakeAgentState.question = "Pick a day";
+    fakeAgentState.options = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const runtime = new PiAgentRuntime();
+    const events: AgentRuntimeEvent[] = [];
+
+    for await (const event of runtime.run(runRequest, runContext)) events.push(event);
+    const ask = events.find((event) => event.type === "ask");
+    expect(ask?.type === "ask" ? ask.actions?.length : 0).toBe(6);
+  });
+
   it("rejects an empty choice set before emitting an ask", async () => {
     fakeAgentState.options = [];
     const runtime = new PiAgentRuntime();
@@ -163,7 +174,7 @@ describe("Pi choice asks", () => {
 
     await expect(async () => {
       for await (const event of runtime.run(runRequest, runContext)) events.push(event);
-    }).rejects.toThrow("ask_user requires two to four unique, non-empty options");
+    }).rejects.toThrow("ask_user requires two to six unique, non-empty options");
     expect(events.some((event) => event.type === "ask")).toBe(false);
   });
 });

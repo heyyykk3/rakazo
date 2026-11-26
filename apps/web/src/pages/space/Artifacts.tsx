@@ -65,13 +65,14 @@ import { createStoredPreference } from "../../lib/preferences/stored-preference"
 import { useSave, useSpaceQueries } from "../../lib/query/query";
 import { errorText } from "../../lib/query/user-error";
 import { useRedrawAtMidnight } from "../shell/chat/use-redraw-at-midnight";
+import { ArtifactImageThumbnail, PagesLibraryPane } from "./artifacts-library";
 
 type ViewMode = "grid" | "list";
 type DateFilter = "all" | "today" | "week" | "month";
-type KindFilter = "all" | "media" | "documents" | "code";
+type KindFilter = "all" | "pages" | "media" | "documents" | "code";
 
 function matchesKindFilter(mimeType: string, filter: KindFilter): boolean {
-  if (filter === "all") return true;
+  if (filter === "all" || filter === "pages") return true;
   const kind = artifactPreviewKind(mimeType);
   if (filter === "media")
     return kind === "image" || kind === "video" || mimeType.startsWith("audio/");
@@ -245,7 +246,10 @@ export function ArtifactsPage() {
   const serverFilterActive = activeBotId !== null || madeByBots;
   const filtersActive = serverFilterActive || clientFilterActive;
   // Nothing to narrow down yet, so the page stays a clean empty state.
-  const showFilters = serverFilterActive || (items !== null && (items.length > 0 || !!nextCursor));
+  const showFilters =
+    kindFilter === "pages" ||
+    serverFilterActive ||
+    (items !== null && (items.length > 0 || !!nextCursor));
 
   function clearFilters() {
     setSearchQuery("");
@@ -300,6 +304,7 @@ export function ArtifactsPage() {
               onValueChange={setKindFilter}
               options={[
                 { value: "all", label: t`All types` },
+                { value: "pages", label: t`Pages` },
                 { value: "media", label: t`Images and video` },
                 { value: "documents", label: t`Documents` },
                 { value: "code", label: t`Code and text` },
@@ -366,7 +371,14 @@ export function ArtifactsPage() {
         </p>
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {artifactId ? (
+        {kindFilter === "pages" ? (
+          <PagesLibraryPane
+            botId={activeBotId}
+            searchQuery={searchQuery}
+            viewMode={viewMode}
+            botsById={botsById}
+          />
+        ) : artifactId ? (
           <>
             {!maximized ? (
               <IndexPane
@@ -787,6 +799,13 @@ function ArtifactCard({
             </span>
           </div>
         </div>
+        {artifactPreviewKind(artifact.mimeType) === "image" ? (
+          <ArtifactImageThumbnail
+            artifactId={artifact.id}
+            mimeType={artifact.mimeType}
+            name={artifact.name}
+          />
+        ) : null}
         <div className="min-w-0">
           <div className="truncate text-body-lg font-semibold">{artifact.name}</div>
           {artifact.description ? (

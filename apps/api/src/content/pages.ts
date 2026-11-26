@@ -32,7 +32,8 @@ import {
   signalPage,
   signalPageUsers,
 } from "@rakazo/db";
-import { getLogger } from "@rakazo/logging";
+import { bestEffort, getLogger } from "@rakazo/logging";
+import { checkPageSource } from "@rakazo/page-kit/validate";
 
 const PAGE_SHARE_SECRET_KIND = "page_share";
 const DEFAULT_LIST_LIMIT = 30;
@@ -541,6 +542,161 @@ export async function readPageImage(
     "page-image-read",
   );
   return pageImageSource(image, await artifacts.get(image.storageKey, context));
+}
+
+/** Converts plain Markdown into a clean, validated PageKit JSX source file. */
+function markdownToPageSource(title: string, markdown: string): string {
+  type Block =
+    | { kind: "heading"; text: string }
+    | { kind: "paragraph"; text: string }
+    | { kind: "bullets"; items: string[] }
+    | { kind: "numbered"; items: string[] };
+
+  const blocks: Block[] = [];
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  let paragraph: string[] = [];
+  let bullets: string[] = [];
+  let numbered: string[] = [];
+
+  const flush = () => {
+    if (paragraph.length) {
+      blocks.push({ kind: "paragraph", text: paragraph.join(" ").trim() });
+      paragraph = [];
+    }
+    if (bullets.length) {
+      blocks.push({ kind: "bullets", items: bullets });
+      bullets = [];
+    }
+    if (numbered.length) {
+      blocks.push({ kind: "numbered", items: numbered });
+      numbered = [];
+    }
+  };
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      flush();
+      continue;
+    }
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) {
+      flush();
+      blocks.push({ kind: "heading", text: headingMatch[1]!.trim() });
+      continue;
+    }
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/);
+    if (bulletMatch) {
+      if (paragraph.length || numbered.length) flush();
+      bullets.push(bulletMatch[1]!.trim());
+      continue;
+    }
+    const numMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (numMatch) {
+      if (paragraph.length || bullets.length) flush();
+      numbered.push(numMatch[1]!.trim());
+      continue;
+    }
+    if (bullets.length || numbered.length) flush();
+    paragraph.push(trimmed);
+  }
+  flush();
+
+  const sections: Array<{ heading?: string; items: Block[] }> = [];
+  let current: { heading?: string; items: Block[] } = { items: [] };
+  for (const block of blocks) {
+    if (block.kind === "heading") {
+      if (current.heading || current.items.length) sections.push(current);
+      current = { heading: block.text, items: [] };
+    } else {
+      current.items.push(block);
+    }
+  }
+  if (current.heading || current.items.length) sections.push(current);
+  if (sections.length === 0)
+    sections.push({ items: [{ kind: "paragraph", text: markdown.trim() }] });
+
+  const dataLiteral = JSON.stringify({ title, sections });
+  return `const DATA = ${dataLiteral};
+
+export default function MessagePage() {
+  return (
+    <Page title={DATA.title}>
+      {DATA.sections.map((section, sIndex) => (
+        <Section key={sIndex} heading={section.heading}>
+          {section.items.map((item, iIndex) => {
+            if (item.kind === "bullets") return <BulletList key={iIndex} items={item.items} />;
+            if (item.kind === "numbered") return <NumberedList key={iIndex} items={item.items} />;
+            return <Text key={iIndex}>{item.text}</Text>;
+          })}
+        </Section>
+      ))}
+    </Page>
+  );
+}
+`;
+}
+
+export async function createPageFromMarkdown(
+  prisma: PrismaClient,
+  actor: Actor,
+  input: { botId?: string; groupId?: string; title: string; markdown: string },
+  events?: ThreadEvents,
+): Promise<PageSummary> {
+  let botId: string | null = null;
+  let groupId: string | null = null;
+  if (input.groupId) {
+    const group = await prisma.chatGroup.findFirst({
+      where: { id: input.groupId, spaceId: actor.spaceId },
+      select: { id: true },
+    });
+    if (!group) throw new IsolationError();
+    groupId = group.id;
+  }
+  if (input.botId) {
+    const bot = await prisma.bot.findFirst({
+      where: { id: input.botId, spaceId: actor.spaceId },
+      select: { id: true },
+    });
+    if (!bot) throw new IsolationError();
+    botId = bot.id;
+  }
+  if (!botId && !groupId) {
+    const firstBot = await prisma.bot.findFirst({
+      where: { spaceId: actor.spaceId, archivedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (!firstBot) throw new ClientError("BAD_REQUEST", "No bot found in this Space");
+    botId = firstBot.id;
+  }
+  const source = markdownToPageSource(input.title, input.markdown);
+  const checked = checkPageSource(source);
+  if (!checked.ok) {
+    throw new ClientError("BAD_REQUEST", checked.errors[0] ?? "Could not compile page");
+  }
+  const created = await prisma.page.create({
+    data: {
+      spaceId: actor.spaceId,
+      userId: actor.userId,
+      botId,
+      groupId,
+      title: input.title,
+      versions: {
+        create: {
+          version: 1,
+          title: input.title,
+          source,
+          code: checked.code,
+        },
+      },
+    },
+    select: summarySelect,
+  });
+  if (events) {
+    void bestEffort("signal page created", signalPage(prisma, events, created.id));
+  }
+  return pageSummary(created);
 }
 
 /** Removes deleted pages' pictures once the deletion commits; the rows are gone, so failures only log. */

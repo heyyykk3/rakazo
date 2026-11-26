@@ -189,6 +189,16 @@ export const artifactsRpc = {
         z.strictObject({ visibility: PageVisibilitySchema, shareUrl: z.string().nullable() }),
       ),
     pin: oc.input(z.strictObject({ pageId: Id, pinned: z.boolean() })).output(PageSummarySchema),
+    create: oc
+      .input(
+        z.strictObject({
+          botId: Id.optional(),
+          groupId: Id.optional(),
+          title: PageTitleSchema,
+          markdown: z.string().trim().min(1).max(60_000),
+        }),
+      )
+      .output(PageSummarySchema),
     remove: oc.input(z.strictObject({ pageId: Id })).output(z.object({ ok: z.literal(true) })),
   },
 };

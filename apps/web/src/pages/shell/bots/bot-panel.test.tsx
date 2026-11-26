@@ -301,7 +301,11 @@ it("shows the profile and folds the settings away", async () => {
     "Ada",
   );
   expect(container.querySelector('input[aria-label="Name"]')).toBeNull();
-  expect(container.querySelector('[role="tab"]')).toBeNull();
+  expect([...container.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual([
+    "Overview",
+    "Files",
+    "Settings",
+  ]);
   expect(
     [...container.querySelectorAll("button")].some((button) => button.textContent === "Save"),
   ).toBe(false);

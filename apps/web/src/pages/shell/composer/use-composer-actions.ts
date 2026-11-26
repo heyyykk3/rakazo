@@ -735,6 +735,7 @@ export function useComposerActions({
     /** Laid over the transcript's own props: scroll on send, and the sends not stored yet. */
     transcriptProps: {
       followRequest: sentCount,
+      onSendStarter: (text: string) => void sendMessage(text, [], crypto.randomUUID()),
       ...(pendingTranscript ? { transcript: pendingTranscript } : {}),
     },
     sendMessage,

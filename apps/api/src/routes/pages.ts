@@ -15,6 +15,7 @@ import {
 } from "../content/page-collaboration.js";
 import { askPageRevision, getPageDraft, publishPageDraft } from "../content/page-revisions.js";
 import {
+  createPageFromMarkdown,
   getPage,
   listPages,
   pinPage,
@@ -100,6 +101,9 @@ export function pagesRoutes(ctx: RouterContext) {
       ),
       pin: authed.pages.pin.handler(({ context, input }) =>
         pinPage(deps.prisma, context.actor, input.pageId, input.pinned),
+      ),
+      create: authed.pages.create.handler(({ context, input }) =>
+        createPageFromMarkdown(deps.prisma, context.actor, input, deps.events),
       ),
       remove: authed.pages.remove.handler(({ context, input }) =>
         removePage(pageDeps(), context.actor, input.pageId),

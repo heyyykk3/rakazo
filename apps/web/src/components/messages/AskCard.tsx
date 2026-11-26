@@ -20,6 +20,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Input,
   Textarea,
 } from "@rakazo/ui-web";
 import { Check, MoreHorizontal } from "lucide-react";
@@ -165,6 +166,8 @@ function PromptAskCard({
   const { t } = useLingui();
   const [editing, setEditing] = useState(false);
   const [answer, setAnswer] = useState(block.instructionUpdate?.after ?? "");
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customAnswer, setCustomAnswer] = useState("");
   const [acceptedAnswer, setAcceptedAnswer] = useState<string>();
   const [undone, setUndone] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -359,6 +362,40 @@ function PromptAskCard({
               )}
             </OptionRow>
           ))}
+          {canAnswer && !answered ? (
+            customOpen ? (
+              <form
+                data-testid="ask-custom-answer-form"
+                className="mt-2 flex items-center gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitAnswer(customAnswer);
+                }}
+              >
+                <Input
+                  aria-label={t`Your own answer`}
+                  placeholder={t`Type your answer…`}
+                  value={customAnswer}
+                  onChange={(event) => setCustomAnswer(event.target.value)}
+                  disabled={submitting}
+                  className="flex-1 text-body-sm"
+                />
+                <Button type="submit" disabled={submitting || !customAnswer.trim()}>
+                  <Trans>Send</Trans>
+                </Button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                data-testid="ask-custom-answer-trigger"
+                disabled={submitting}
+                onClick={() => setCustomOpen(true)}
+                className="mt-1 px-2 py-1 text-body-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <Trans>Or type your own answer…</Trans>
+              </button>
+            )
+          ) : null}
           {answered ? (
             <span className="sr-only">{block.expired ? t`Expired` : t`Answered`}</span>
           ) : null}

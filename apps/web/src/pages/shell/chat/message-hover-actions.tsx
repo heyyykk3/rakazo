@@ -17,6 +17,7 @@ import {
 import {
   Check,
   Copy,
+  FileText,
   MessageSquareDot,
   MoreHorizontal,
   Reply,
@@ -36,6 +37,7 @@ export function MessageHoverActions({
   onMarkUnread,
   markedUnread = false,
   onReact,
+  onOpenAsPage,
   speech,
 }: {
   message: ThreadMessage;
@@ -46,6 +48,7 @@ export function MessageHoverActions({
   onMarkUnread: (message: ThreadMessage) => void;
   markedUnread?: boolean;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
+  onOpenAsPage?: () => void;
   speech?: { speaking: boolean; disabled: boolean; onSpeak: () => void };
 }) {
   const { t } = useLingui();
@@ -172,6 +175,17 @@ export function MessageHoverActions({
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>
             </DropdownMenuItem>
+            {onOpenAsPage ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  setMoreOpen(false);
+                  onOpenAsPage();
+                }}
+              >
+                <FileText size={14} strokeWidth={1.7} />
+                <Trans>Open as Page</Trans>
+              </DropdownMenuItem>
+            ) : null}
             {speech && !speech.speaking ? (
               <DropdownMenuItem
                 disabled={speech.disabled}

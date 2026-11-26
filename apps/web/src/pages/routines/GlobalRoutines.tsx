@@ -16,7 +16,7 @@ import {
   Switch,
 } from "@rakazo/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Play, Repeat } from "lucide-react";
+import { ChevronLeft, History, Play, Repeat } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IconTooltip } from "../../components/IconTooltip";
@@ -28,6 +28,7 @@ import { useSave, useSpaceQueries } from "../../lib/query/query";
 import { useSpaceRpc } from "../../lib/query/space-rpc";
 import { errorText } from "../../lib/query/user-error";
 import { routineTriggerSummary } from "./RoutineList";
+import { RoutineRunHistory } from "./RoutineRunHistory";
 
 const NO_BOTS: Bot[] = [];
 
@@ -42,6 +43,7 @@ export function GlobalRoutinesPage() {
   const queryClient = useQueryClient();
   const [botFilter, setBotFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [historyRoutineId, setHistoryRoutineId] = useState<string | null>(null);
 
   const botsQuery = useQuery({
     queryKey: queries.bootstrap.queryKey({ input: {} }),
@@ -205,77 +207,99 @@ export function GlobalRoutinesPage() {
               const bot = botsById.get(routine.botId);
               const trigger = routineTriggerSummary(routine, labels, i18n.locale);
               const running = runNow.pending && runNow.input?.id === routine.id;
+              const historyOpen = historyRoutineId === routine.id;
               return (
-                <li
-                  key={routine.id}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40"
-                >
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/app/${routine.botId}?routine=${routine.id}`)}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-start focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    {bot ? (
-                      <BotAvatar
-                        avatarSet={bot.avatarSet}
-                        color={bot.color}
-                        identity={bot.id}
-                        size={32}
-                        status={bot.status}
+                <li key={routine.id} className="px-4 py-3 hover:bg-accent/40">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/app/${routine.botId}?routine=${routine.id}`)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-start focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      {bot ? (
+                        <BotAvatar
+                          avatarSet={bot.avatarSet}
+                          color={bot.color}
+                          identity={bot.id}
+                          size={32}
+                          status={bot.status}
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span
+                            className="truncate text-body font-medium text-foreground"
+                            dir="auto"
+                          >
+                            {routine.name}
+                          </span>
+                          {bot ? (
+                            <span className="shrink-0 text-label text-muted-foreground">
+                              {bot.name}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-0.5 truncate text-body-sm text-muted-foreground">
+                          {trigger}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 text-caption text-muted-foreground/80">
+                          {routine.lastRunAt ? (
+                            <span>
+                              <Trans>Last run {formatRelativeTime(routine.lastRunAt)}</Trans>
+                            </span>
+                          ) : null}
+                          {routine.active && routine.nextRunAt ? (
+                            <span>
+                              <Trans>Next {formatRelativeTime(routine.nextRunAt)}</Trans>
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <IconTooltip label={t`Run history`}>
+                        <Button
+                          type="button"
+                          variant={historyOpen ? "secondary" : "ghost"}
+                          size="icon-sm"
+                          aria-expanded={historyOpen}
+                          aria-label={t`Run history for ${routine.name}`}
+                          onClick={() =>
+                            setHistoryRoutineId((prev) => (prev === routine.id ? null : routine.id))
+                          }
+                        >
+                          <History className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </IconTooltip>
+                      <IconTooltip label={t`Run now`}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t`Run ${routine.name} now`}
+                          disabled={running}
+                          onClick={() => runNow.run(routine)}
+                        >
+                          <Play className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </IconTooltip>
+                      <Switch
+                        checked={routine.active}
+                        aria-label={
+                          routine.active ? t`Pause ${routine.name}` : t`Resume ${routine.name}`
+                        }
+                        disabled={
+                          toggleActive.pending && toggleActive.input?.routine.id === routine.id
+                        }
+                        onCheckedChange={(active) => toggleActive.run({ routine, active })}
                       />
-                    ) : null}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate text-body font-medium text-foreground" dir="auto">
-                          {routine.name}
-                        </span>
-                        {bot ? (
-                          <span className="shrink-0 text-label text-muted-foreground">
-                            {bot.name}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-0.5 truncate text-body-sm text-muted-foreground">
-                        {trigger}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap gap-x-3 text-caption text-muted-foreground/80">
-                        {routine.lastRunAt ? (
-                          <span>
-                            <Trans>Last run {formatRelativeTime(routine.lastRunAt)}</Trans>
-                          </span>
-                        ) : null}
-                        {routine.active && routine.nextRunAt ? (
-                          <span>
-                            <Trans>Next {formatRelativeTime(routine.nextRunAt)}</Trans>
-                          </span>
-                        ) : null}
-                      </div>
                     </div>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <IconTooltip label={t`Run now`}>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t`Run ${routine.name} now`}
-                        disabled={running}
-                        onClick={() => runNow.run(routine)}
-                      >
-                        <Play className="size-3.5" aria-hidden="true" />
-                      </Button>
-                    </IconTooltip>
-                    <Switch
-                      checked={routine.active}
-                      aria-label={
-                        routine.active ? t`Pause ${routine.name}` : t`Resume ${routine.name}`
-                      }
-                      disabled={
-                        toggleActive.pending && toggleActive.input?.routine.id === routine.id
-                      }
-                      onCheckedChange={(active) => toggleActive.run({ routine, active })}
-                    />
                   </div>
+                  {historyOpen ? (
+                    <div className="mt-2 border-t border-border/60 pt-1 [&>section]:mt-2">
+                      <RoutineRunHistory routineId={routine.id} />
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

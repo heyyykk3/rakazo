@@ -118,9 +118,13 @@ export function BotSettings({
   // A model deep link opens Settings, then focuses the model once Settings is shown: a control
   // inside a hidden section cannot take focus.
   const modelFocusPending = useRef(false);
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "routines" | "computer" | "files" | "settings"
+  >("overview");
   useEffect(() => {
     if (focusModel && view === "settings") {
       modelFocusPending.current = true;
+      setActiveTab("settings");
       setSettingsOpen(true);
     }
   }, [view, focusModel]);
@@ -597,52 +601,112 @@ export function BotSettings({
             </div>
           ) : null}
         </div>
-        <div className="space-y-6">
-          <BotOverviewSection bot={bot} onOpenArtifacts={onOpenArtifacts} />
+        <div
+          role="tablist"
+          aria-label={t`Bot sections`}
+          data-testid="bot-panel-tabs"
+          className="mb-5 flex flex-wrap gap-1 rounded-xl bg-muted/60 p-1"
+        >
+          {(
+            [
+              { id: "overview", label: t`Overview` },
+              ...(routines ? [{ id: "routines" as const, label: t`Routines` }] : []),
+              ...(computer ? [{ id: "computer" as const, label: t`Computer` }] : []),
+              { id: "files", label: t`Files` },
+              { id: "settings", label: t`Settings` },
+            ] as const
+          ).map((tab) => {
+            const selected = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id === "settings") setSettingsOpen(true);
+                }}
+                className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-caption font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                  selected
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        {activeTab === "routines" && routines ? <RoutineList {...routines} /> : null}
+        {activeTab === "files" ? (
+          <div className="space-y-4">
+            <PagesList botId={bot.id} />
+            {onOpenArtifacts ? (
+              <Button variant="outline" size="sm" className="w-full" onClick={onOpenArtifacts}>
+                <Trans>Browse all files and media</Trans>
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="space-y-6" hidden={activeTab !== "overview" && activeTab !== "computer"}>
+          <div hidden={activeTab !== "overview"}>
+            <BotOverviewSection bot={bot} onOpenArtifacts={onOpenArtifacts} />
+          </div>
           {computer ? (
             <PanelSection label={<Trans>Computer</Trans>}>{computer}</PanelSection>
           ) : null}
           {routines ? (
-            <PanelSection
-              label={
-                routineCount > ROUTINE_PREVIEW_COUNT ? (
-                  <button
-                    type="button"
-                    onClick={() => onViewChange?.("routines")}
-                    className="flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
+            <div hidden={activeTab !== "overview"}>
+              <PanelSection
+                label={
+                  routineCount > ROUTINE_PREVIEW_COUNT ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("routines")}
+                      className="flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Trans>Routines</Trans>
+                      <ChevronRight aria-hidden="true" className="size-3.5 rtl:rotate-180" />
+                    </button>
+                  ) : (
                     <Trans>Routines</Trans>
-                    <ChevronRight aria-hidden="true" className="size-3.5 rtl:rotate-180" />
-                  </button>
-                ) : (
-                  <Trans>Routines</Trans>
-                )
-              }
-              action={
-                routineCount > 0 ? (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    data-testid="routine-create-button"
-                    aria-label={t`Create routine`}
-                    onClick={routines.onCreate}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                ) : null
-              }
-            >
-              <RoutineList {...routines} preview />
-            </PanelSection>
+                  )
+                }
+                action={
+                  routineCount > 0 ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      data-testid="routine-create-button"
+                      aria-label={t`Create routine`}
+                      onClick={routines.onCreate}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  ) : null
+                }
+              >
+                <RoutineList {...routines} preview />
+              </PanelSection>
+            </div>
           ) : null}
-          <PagesList botId={bot.id} preview={{ onOpenAll: () => onViewChange?.("pages") }} />
+          <div hidden={activeTab !== "overview"}>
+            <PagesList botId={bot.id} preview={{ onOpenAll: () => setActiveTab("files") }} />
+          </div>
         </div>
-        <ErrorBoundary fallback={<SectionLoadFailed />}>
-          <Suspense fallback={null}>
-            <ScratchpadSection botId={bot.id} />
-          </Suspense>
-        </ErrorBoundary>
-        <div className="mt-6" data-testid="bot-settings-advanced">
+        <div hidden={activeTab !== "overview"}>
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <ScratchpadSection botId={bot.id} />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+        <div
+          className="mt-6"
+          data-testid="bot-settings-advanced"
+          hidden={activeTab !== "overview" && activeTab !== "settings"}
+        >
           <SectionHeading variant="label" className="flex min-h-6 items-center">
             <button
               type="button"
