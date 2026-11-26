@@ -350,6 +350,16 @@ export function speechFromBlocks(blocks: MessageBlock[]): string {
           .join(". ");
         return block.title ? `${block.title}: ${items}` : items;
       }
+      if (block.kind === "weather") {
+        return `${block.location}: ${block.temperature} and ${block.condition}.`;
+      }
+      if (block.kind === "places") {
+        const names = block.items.map((item) => item.name).join(", ");
+        return block.title ? `${block.title}: ${names}` : names;
+      }
+      if (block.kind === "inline_html") {
+        return block.title;
+      }
       return "";
     })
     .filter(Boolean)

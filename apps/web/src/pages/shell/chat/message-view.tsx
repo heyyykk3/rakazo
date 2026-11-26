@@ -25,6 +25,11 @@ import { CloudAgentCard } from "../../../components/messages/CloudAgentCard";
 import { McpAppCard } from "../../../components/messages/McpAppCard";
 import { OutgoingDraftCard } from "../../../components/messages/OutgoingDraftCard";
 import { ResultCards } from "../../../components/messages/ResultCards";
+import {
+  InlineHtmlCard,
+  PlacesCard,
+  WeatherCard,
+} from "../../../components/messages/RichVisualCards";
 import { SubagentCard } from "../../../components/messages/SubagentCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
@@ -785,6 +790,30 @@ export const MessageView = memo(function MessageView({
             return (
               <div key={i} className="relative w-full min-w-0">
                 <ResultCards block={block} />
+                {i === hoverAnchorIndex ? hoverActions : null}
+              </div>
+            );
+          }
+          if (block.kind === "weather") {
+            return (
+              <div key={i} className="relative w-full min-w-0">
+                <WeatherCard block={block} />
+                {i === hoverAnchorIndex ? hoverActions : null}
+              </div>
+            );
+          }
+          if (block.kind === "places") {
+            return (
+              <div key={i} className="relative w-full min-w-0">
+                <PlacesCard block={block} />
+                {i === hoverAnchorIndex ? hoverActions : null}
+              </div>
+            );
+          }
+          if (block.kind === "inline_html") {
+            return (
+              <div key={i} className="relative w-full min-w-0">
+                <InlineHtmlCard block={block} />
                 {i === hoverAnchorIndex ? hoverActions : null}
               </div>
             );

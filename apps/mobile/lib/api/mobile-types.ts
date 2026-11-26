@@ -164,6 +164,11 @@ export function blockText(message: MobileMessage) {
         return block.lines.map((line) => `${line.k}: ${line.v}`).join("\n");
       if (block.kind === "result_cards")
         return block.title || block.items.map((item) => item.title).join(", ");
+      if (block.kind === "weather")
+        return `${block.location}: ${block.temperature}, ${block.condition}`;
+      if (block.kind === "places")
+        return block.title || block.items.map((item) => item.name).join(", ");
+      if (block.kind === "inline_html") return block.title;
       if (block.kind === "image") return `[image: ${block.name ?? "attachment"}]`;
       if (block.kind === "file") {
         return `[file: ${block.name ?? "attachment"}${block.size ? ` (${block.size} bytes)` : ""}]`;

@@ -479,9 +479,17 @@ function pushMessageHits(
               ]
                 .filter(Boolean)
                 .join(" ")
-            : block.kind === "ask"
-              ? block.text
-              : null;
+            : block.kind === "weather"
+              ? `${block.location} ${block.temperature} ${block.condition}`
+              : block.kind === "places"
+                ? [block.title, ...block.items.flatMap((item) => [item.name, item.address])]
+                    .filter(Boolean)
+                    .join(" ")
+                : block.kind === "inline_html"
+                  ? block.title
+                  : block.kind === "ask"
+                    ? block.text
+                    : null;
     if (structuredText && matchesSearchQuery(ctx.query, structuredText)) {
       ctx.push({
         kind: "message",

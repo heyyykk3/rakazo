@@ -186,6 +186,12 @@ function replyBlockText(block: MessageBlock): string {
       return block.lines.map((line) => `${line.k}: ${line.v}`).join(", ");
     case "result_cards":
       return block.title || block.items.map((item) => item.title).join(", ");
+    case "weather":
+      return `${block.location}: ${block.temperature}, ${block.condition}`;
+    case "places":
+      return block.title || block.items.map((item) => item.name).join(", ");
+    case "inline_html":
+      return block.title;
     case "steps":
       return block.steps.map((step) => step.label).join(", ");
     case "voice_call":

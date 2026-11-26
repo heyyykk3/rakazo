@@ -242,6 +242,92 @@ export const conversationTools: ConnectorTool[] = [
     },
   },
   {
+    name: "show_weather",
+    description:
+      "Post a structured weather card in this chat with current conditions and optional multi-day forecast instead of plain text.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        location: { type: "string", maxLength: 120 },
+        temperature: { type: "string", maxLength: 32 },
+        condition: { type: "string", maxLength: 80 },
+        icon: {
+          type: "string",
+          enum: ["sun", "partly_cloudy", "cloud", "rain", "snow", "storm", "wind", "fog"],
+        },
+        high: { type: "string", maxLength: 24 },
+        low: { type: "string", maxLength: 24 },
+        humidity: { type: "string", maxLength: 32 },
+        wind: { type: "string", maxLength: 40 },
+        forecast: {
+          type: "array",
+          maxItems: 7,
+          items: {
+            type: "object",
+            properties: {
+              day: { type: "string", maxLength: 40 },
+              high: { type: "string", maxLength: 24 },
+              low: { type: "string", maxLength: 24 },
+              condition: { type: "string", maxLength: 80 },
+              icon: {
+                type: "string",
+                enum: ["sun", "partly_cloudy", "cloud", "rain", "snow", "storm", "wind", "fog"],
+              },
+            },
+            required: ["day", "high"],
+          },
+        },
+      },
+      required: ["location", "temperature", "condition"],
+    },
+  },
+  {
+    name: "show_places",
+    description:
+      "Post a places card with an interactive map of coordinates and clickable place rows for restaurants, venues, landmarks, or local search results.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", maxLength: 120 },
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", maxLength: 160 },
+              category: { type: "string", maxLength: 80 },
+              rating: { type: "string", maxLength: 40 },
+              priceLevel: { type: "string", maxLength: 20 },
+              address: { type: "string", maxLength: 240 },
+              distance: { type: "string", maxLength: 40 },
+              lat: { type: "number", minimum: -90, maximum: 90 },
+              lng: { type: "number", minimum: -180, maximum: 180 },
+              url: { type: "string", maxLength: 2048 },
+            },
+            required: ["name"],
+          },
+        },
+      },
+      required: ["items"],
+    },
+  },
+  {
+    name: "show_html",
+    description:
+      "Render a compact self-contained HTML widget or preview inline in chat inside a sandboxed frame (no external network requests). Prefer save_page for full reports or dashboards.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", maxLength: 120 },
+        html: { type: "string", maxLength: 65_536 },
+        height: { type: "integer", minimum: 120, maximum: 720 },
+      },
+      required: ["title", "html"],
+    },
+  },
+  {
     name: "request_secret",
     get description() {
       return secretAskToolSurface().description;

@@ -175,4 +175,64 @@ describe("bot react, show_status, and show_cards tools", () => {
       },
     ]);
   });
+
+  it("posts structured weather, places, and inline HTML cards with redaction", async () => {
+    const { ctx, createdMessages } = makeContext();
+    await expect(
+      messagingTools.show_weather!(
+        ctx,
+        makeCall({
+          location: "Toronto",
+          temperature: "18°C",
+          condition: "Partly cloudy",
+          icon: "partly_cloudy",
+          high: "21°C",
+          low: "12°C",
+          forecast: [{ day: "Thu", high: "22°C", low: "13°C", icon: "sun" }],
+        }),
+      ),
+    ).resolves.toEqual({ ok: true, location: "Toronto" });
+
+    await expect(
+      messagingTools.show_places!(
+        ctx,
+        makeCall({
+          title: "Coffee nearby",
+          items: [
+            {
+              name: "Pilot Coffee",
+              category: "Cafe",
+              rating: "4.8",
+              lat: 43.6532,
+              lng: -79.3832,
+              url: "https://example.com/pilot",
+            },
+          ],
+        }),
+      ),
+    ).resolves.toEqual({ ok: true, count: 1 });
+
+    await expect(
+      messagingTools.show_html!(
+        ctx,
+        makeCall({
+          title: "Countdown",
+          html: "<div>super-secret-token</div>",
+          height: 240,
+        }),
+      ),
+    ).resolves.toEqual({ ok: true, title: "Countdown" });
+
+    expect(createdMessages[0]?.blocks[0]).toMatchObject({ kind: "weather", location: "Toronto" });
+    expect(createdMessages[1]?.blocks[0]).toMatchObject({
+      kind: "places",
+      title: "Coffee nearby",
+    });
+    expect(createdMessages[2]?.blocks[0]).toEqual({
+      kind: "inline_html",
+      title: "Countdown",
+      html: "<div>[redacted]</div>",
+      height: 240,
+    });
+  });
 });

@@ -86,7 +86,10 @@ const AREAS: Array<[area: string, matches: (name: string) => boolean]> = [
       name === "render_plot" ||
       name === "save_page" ||
       name === "show_cards" ||
-      name === "show_status",
+      name === "show_html" ||
+      name === "show_places" ||
+      name === "show_status" ||
+      name === "show_weather",
   ],
   ["chat", (name) => name === "react"],
   ["cloud agents", (name) => name.startsWith("cloud_agent_")],

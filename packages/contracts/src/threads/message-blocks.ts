@@ -131,6 +131,40 @@ export const ResultCardItem = z.object({
 });
 export type ResultCardItem = z.infer<typeof ResultCardItem>;
 
+export const WeatherIconSchema = z.enum([
+  "sun",
+  "partly_cloudy",
+  "cloud",
+  "rain",
+  "snow",
+  "storm",
+  "wind",
+  "fog",
+]);
+export type WeatherIcon = z.infer<typeof WeatherIconSchema>;
+
+export const WeatherForecastDay = z.object({
+  day: z.string().max(40),
+  high: z.string().max(24),
+  low: z.string().max(24).optional(),
+  condition: z.string().max(80).optional(),
+  icon: WeatherIconSchema.optional(),
+});
+export type WeatherForecastDay = z.infer<typeof WeatherForecastDay>;
+
+export const PlaceCardItem = z.object({
+  name: z.string().max(160),
+  category: z.string().max(80).optional(),
+  rating: z.string().max(40).optional(),
+  priceLevel: z.string().max(20).optional(),
+  address: z.string().max(240).optional(),
+  distance: z.string().max(40).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  url: z.string().max(2048).optional(),
+});
+export type PlaceCardItem = z.infer<typeof PlaceCardItem>;
+
 export const MessageBlock = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), text: z.string() }),
   z.object({
@@ -141,6 +175,29 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     kind: z.literal("result_cards"),
     title: z.string().max(120).optional(),
     items: z.array(ResultCardItem).min(1).max(12),
+  }),
+  z.object({
+    kind: z.literal("weather"),
+    location: z.string().max(120),
+    temperature: z.string().max(32),
+    condition: z.string().max(80),
+    icon: WeatherIconSchema.optional(),
+    high: z.string().max(24).optional(),
+    low: z.string().max(24).optional(),
+    humidity: z.string().max(32).optional(),
+    wind: z.string().max(40).optional(),
+    forecast: z.array(WeatherForecastDay).max(7).optional(),
+  }),
+  z.object({
+    kind: z.literal("places"),
+    title: z.string().max(120).optional(),
+    items: z.array(PlaceCardItem).min(1).max(12),
+  }),
+  z.object({
+    kind: z.literal("inline_html"),
+    title: z.string().max(120),
+    html: z.string().max(65_536),
+    height: z.number().int().min(120).max(720).optional(),
   }),
   z.object({
     kind: z.literal("ask"),

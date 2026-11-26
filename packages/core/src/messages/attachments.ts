@@ -273,6 +273,16 @@ function blockHistoryText(block: MessageBlock): string {
       .join(", ");
     return `[cards${block.title ? `: ${block.title}` : ""}: ${items}]`;
   }
+  if (block.kind === "weather") {
+    return `[weather: ${block.location} ${block.temperature} ${block.condition}]`;
+  }
+  if (block.kind === "places") {
+    const names = block.items.map((item) => item.name).join(", ");
+    return `[places${block.title ? `: ${block.title}` : ""}: ${names}]`;
+  }
+  if (block.kind === "inline_html") {
+    return `[html: ${block.title}]`;
+  }
   if (block.kind === "app") return `[app: ${block.server} showed ${block.tool}]`;
   if (block.kind === "image") return `[image: ${block.name}]`;
   // The id lets a later turn, or another chat, update this page instead of making a new one.

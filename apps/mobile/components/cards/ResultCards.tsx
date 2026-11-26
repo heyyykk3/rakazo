@@ -5,6 +5,9 @@ import { mobileTokens } from "../../lib/appearance/appearance";
 
 type ResultCardsBlock = Extract<MessageBlock, { kind: "result_cards" }>;
 type StatusCardBlock = Extract<MessageBlock, { kind: "card" }>;
+type WeatherBlock = Extract<MessageBlock, { kind: "weather" }>;
+type PlacesBlock = Extract<MessageBlock, { kind: "places" }>;
+type InlineHtmlBlock = Extract<MessageBlock, { kind: "inline_html" }>;
 
 export function StatusCard({ block }: { block: StatusCardBlock }) {
   const tokens = mobileTokens();
@@ -153,6 +156,156 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+export function WeatherCard({ block }: { block: WeatherBlock }) {
+  const tokens = mobileTokens();
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        backgroundColor: tokens.card,
+        padding: 14,
+        gap: 6,
+      }}
+    >
+      <Text style={{ fontSize: typeScale.secondary.fontSize, color: tokens.mutedForeground }}>
+        {block.location}
+      </Text>
+      <Text
+        style={{
+          fontSize: typeScale.title.fontSize,
+          lineHeight: typeScale.title.lineHeight,
+          fontWeight: fontWeight.semibold,
+          color: tokens.foreground,
+        }}
+      >
+        {block.temperature}
+      </Text>
+      <Text style={{ fontSize: typeScale.secondary.fontSize, color: tokens.mutedForeground }}>
+        {block.condition}
+      </Text>
+      {block.high || block.low ? (
+        <Text style={{ fontSize: typeScale.caption.fontSize, color: tokens.mutedForeground }}>
+          {[block.high ? `H: ${block.high}` : "", block.low ? `L: ${block.low}` : ""]
+            .filter(Boolean)
+            .join(", ")}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+export function PlacesCard({ block }: { block: PlacesBlock }) {
+  const tokens = mobileTokens();
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        backgroundColor: tokens.card,
+        overflow: "hidden",
+      }}
+    >
+      {block.title ? (
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: tokens.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: typeScale.secondary.fontSize,
+              fontWeight: fontWeight.semibold,
+              color: tokens.foreground,
+            }}
+          >
+            {block.title}
+          </Text>
+        </View>
+      ) : null}
+      {block.items.map((item, index) => {
+        const href =
+          safeExternalUrl(item.url) ??
+          (typeof item.lat === "number" && typeof item.lng === "number"
+            ? `https://www.openstreetmap.org/?mlat=${item.lat}&mlon=${item.lng}#map=15/${item.lat}/${item.lng}`
+            : undefined);
+        return (
+          <Pressable
+            key={`${item.name}-${index}`}
+            disabled={!href}
+            onPress={() => {
+              if (href) void Linking.openURL(href);
+            }}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              gap: 2,
+              borderTopWidth: index > 0 ? 1 : 0,
+              borderTopColor: tokens.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: typeScale.body.fontSize,
+                fontWeight: fontWeight.semibold,
+                color: tokens.foreground,
+              }}
+            >
+              {`${index + 1}. ${item.name}`}
+            </Text>
+            {item.category || item.rating || item.priceLevel ? (
+              <Text style={{ fontSize: typeScale.caption.fontSize, color: tokens.mutedForeground }}>
+                {[item.category, item.rating ? `★ ${item.rating}` : "", item.priceLevel]
+                  .filter(Boolean)
+                  .join(", ")}
+              </Text>
+            ) : null}
+            {item.address ? (
+              <Text style={{ fontSize: typeScale.caption.fontSize, color: tokens.mutedForeground }}>
+                {item.address}
+              </Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function InlineHtmlSummaryCard({ block }: { block: InlineHtmlBlock }) {
+  const tokens = mobileTokens();
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        backgroundColor: tokens.card,
+        padding: 14,
+        gap: 4,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: typeScale.body.fontSize,
+          fontWeight: fontWeight.semibold,
+          color: tokens.foreground,
+        }}
+      >
+        {block.title}
+      </Text>
+      <Text style={{ fontSize: typeScale.caption.fontSize, color: tokens.mutedForeground }}>
+        Open on web or desktop to view interactive HTML preview.
+      </Text>
     </View>
   );
 }

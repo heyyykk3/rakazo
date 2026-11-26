@@ -90,6 +90,33 @@ export function redactBlocks(blocks: MessageBlock[], secrets: string[]): Message
         })),
       };
     }
+    if (block.kind === "weather") {
+      return {
+        ...block,
+        location: redactSecrets(block.location, secrets),
+        temperature: redactSecrets(block.temperature, secrets),
+        condition: redactSecrets(block.condition, secrets),
+      };
+    }
+    if (block.kind === "places") {
+      return {
+        ...block,
+        ...(block.title ? { title: redactSecrets(block.title, secrets) } : {}),
+        items: block.items.map((item) => ({
+          ...item,
+          name: redactSecrets(item.name, secrets),
+          ...(item.address ? { address: redactSecrets(item.address, secrets) } : {}),
+          ...(item.category ? { category: redactSecrets(item.category, secrets) } : {}),
+        })),
+      };
+    }
+    if (block.kind === "inline_html") {
+      return {
+        ...block,
+        title: redactSecrets(block.title, secrets),
+        html: redactSecrets(block.html, secrets),
+      };
+    }
     if (block.kind === "page") return { ...block, title: redactSecrets(block.title, secrets) };
     if (block.kind === "steps") {
       return {

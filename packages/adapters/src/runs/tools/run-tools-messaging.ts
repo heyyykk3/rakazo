@@ -1,6 +1,11 @@
 import { posix } from "node:path";
-import type { ResultCardItem } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT, MessageReactionSchema } from "@rakazo/contracts";
+import type {
+  PlaceCardItem,
+  ResultCardItem,
+  WeatherForecastDay,
+  WeatherIcon,
+} from "@rakazo/contracts";
+import { ATTACHMENT_MAX_COUNT, MessageReactionSchema, WeatherIconSchema } from "@rakazo/contracts";
 import {
   BOT_MESSAGE_MAX_LENGTH,
   BOT_MESSAGE_TOO_LONG,
@@ -469,6 +474,155 @@ export const messagingTools: ToolHandlers = {
       `result-cards:${call.effectKey}`,
     );
     return call.finish({ ok: true, count: items.length });
+  },
+  async show_weather(ctx, call) {
+    const { deps, run } = ctx;
+    const { args } = call;
+    const location = redactSecrets(String(args.location ?? "").trim(), ctx.secrets).slice(0, 120);
+    const temperature = redactSecrets(String(args.temperature ?? "").trim(), ctx.secrets).slice(
+      0,
+      32,
+    );
+    const condition = redactSecrets(String(args.condition ?? "").trim(), ctx.secrets).slice(0, 80);
+    if (!location || !temperature || !condition) {
+      return call.finish({ error: "location, temperature, and condition are required" });
+    }
+    const iconParsed = WeatherIconSchema.safeParse(args.icon);
+    const icon: WeatherIcon | undefined = iconParsed.success ? iconParsed.data : undefined;
+    const optStr = (value: unknown, max: number) =>
+      typeof value === "string" && value.trim()
+        ? redactSecrets(value.trim(), ctx.secrets).slice(0, max)
+        : undefined;
+    const forecast: WeatherForecastDay[] | undefined = Array.isArray(args.forecast)
+      ? args.forecast.slice(0, 7).flatMap((entry): WeatherForecastDay[] => {
+          if (!entry || typeof entry !== "object") return [];
+          const row = entry as Record<string, unknown>;
+          const day = optStr(row.day, 40);
+          const high = optStr(row.high, 24);
+          if (!day || !high) return [];
+          const low = optStr(row.low, 24);
+          const cond = optStr(row.condition, 80);
+          const rowIcon = WeatherIconSchema.safeParse(row.icon);
+          return [
+            {
+              day,
+              high,
+              ...(low ? { low } : {}),
+              ...(cond ? { condition: cond } : {}),
+              ...(rowIcon.success ? { icon: rowIcon.data } : {}),
+            },
+          ];
+        })
+      : undefined;
+    const high = optStr(args.high, 24);
+    const low = optStr(args.low, 24);
+    const humidity = optStr(args.humidity, 32);
+    const wind = optStr(args.wind, 40);
+    await publishMessage(
+      deps,
+      run,
+      "bot",
+      [
+        {
+          kind: "weather",
+          location,
+          temperature,
+          condition,
+          ...(icon ? { icon } : {}),
+          ...(high ? { high } : {}),
+          ...(low ? { low } : {}),
+          ...(humidity ? { humidity } : {}),
+          ...(wind ? { wind } : {}),
+          ...(forecast && forecast.length > 0 ? { forecast } : {}),
+        },
+      ],
+      true,
+      `weather:${call.effectKey}`,
+    );
+    return call.finish({ ok: true, location });
+  },
+  async show_places(ctx, call) {
+    const { deps, run } = ctx;
+    const rawItems = Array.isArray(call.args.items) ? call.args.items : [];
+    const items: PlaceCardItem[] = [];
+    for (const entry of rawItems.slice(0, 12)) {
+      if (!entry || typeof entry !== "object") continue;
+      const row = entry as Record<string, unknown>;
+      const name = redactSecrets(String(row.name ?? "").trim(), ctx.secrets).slice(0, 160);
+      if (!name) continue;
+      const optStr = (value: unknown, max: number) =>
+        typeof value === "string" && value.trim()
+          ? redactSecrets(value.trim(), ctx.secrets).slice(0, max)
+          : undefined;
+      const category = optStr(row.category, 80);
+      const rating = optStr(row.rating, 40);
+      const priceLevel = optStr(row.priceLevel, 20);
+      const address = optStr(row.address, 240);
+      const distance = optStr(row.distance, 40);
+      const lat =
+        typeof row.lat === "number" && Number.isFinite(row.lat) && row.lat >= -90 && row.lat <= 90
+          ? row.lat
+          : undefined;
+      const lng =
+        typeof row.lng === "number" && Number.isFinite(row.lng) && row.lng >= -180 && row.lng <= 180
+          ? row.lng
+          : undefined;
+      const url =
+        typeof row.url === "string" ? (normalizedHttpUrl(row.url) ?? undefined) : undefined;
+      items.push({
+        name,
+        ...(category ? { category } : {}),
+        ...(rating ? { rating } : {}),
+        ...(priceLevel ? { priceLevel } : {}),
+        ...(address ? { address } : {}),
+        ...(distance ? { distance } : {}),
+        ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+        ...(url ? { url } : {}),
+      });
+    }
+    if (items.length === 0) {
+      return call.finish({ error: "Provide at least one place item with a name" });
+    }
+    const title =
+      typeof call.args.title === "string" && call.args.title.trim()
+        ? redactSecrets(call.args.title.trim(), ctx.secrets).slice(0, 120)
+        : undefined;
+    await publishMessage(
+      deps,
+      run,
+      "bot",
+      [{ kind: "places", ...(title ? { title } : {}), items }],
+      true,
+      `places:${call.effectKey}`,
+    );
+    return call.finish({ ok: true, count: items.length });
+  },
+  async show_html(ctx, call) {
+    const { deps, run } = ctx;
+    const title = redactSecrets(String(call.args.title ?? "").trim(), ctx.secrets).slice(0, 120);
+    const html = redactSecrets(String(call.args.html ?? "").trim(), ctx.secrets);
+    if (!title || !html) {
+      return call.finish({ error: "title and html are required" });
+    }
+    if (html.length > 65_536) {
+      return call.finish({
+        error: "html must be 64 KB or smaller; use save_page for larger content",
+      });
+    }
+    const rawHeight = call.args.height;
+    const height =
+      typeof rawHeight === "number" && Number.isFinite(rawHeight)
+        ? Math.max(120, Math.min(720, Math.round(rawHeight)))
+        : undefined;
+    await publishMessage(
+      deps,
+      run,
+      "bot",
+      [{ kind: "inline_html", title, html, ...(height ? { height } : {}) }],
+      true,
+      `inline-html:${call.effectKey}`,
+    );
+    return call.finish({ ok: true, title });
   },
   async message_bot(ctx, call) {
     const { deps, run, bot } = ctx;

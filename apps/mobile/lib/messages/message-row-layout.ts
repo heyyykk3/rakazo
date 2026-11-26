@@ -27,6 +27,9 @@ export function messageRowLayout(
       block.kind === "app" ||
       block.kind === "page" ||
       block.kind === "result_cards" ||
+      block.kind === "weather" ||
+      block.kind === "places" ||
+      block.kind === "inline_html" ||
       (block.kind === "ask" &&
         block.status !== "answered" &&
         Boolean(block.actions?.length) &&

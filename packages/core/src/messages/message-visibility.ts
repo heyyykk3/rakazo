@@ -180,6 +180,9 @@ export function foldPeerReplies<T extends PresentableMessage>(
           block.kind === "chart" ||
           block.kind === "card" ||
           block.kind === "result_cards" ||
+          block.kind === "weather" ||
+          block.kind === "places" ||
+          block.kind === "inline_html" ||
           block.kind === "app" ||
           block.kind === "page",
       )

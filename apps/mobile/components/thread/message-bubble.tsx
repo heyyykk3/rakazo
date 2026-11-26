@@ -53,7 +53,13 @@ import { ChangeUndo, isUndoableChange } from "../cards/change-undo";
 import { ImportSetupCard } from "../cards/ImportSetupCard";
 import { McpApprovalCard } from "../cards/McpApprovalCard";
 import { OutgoingDraftCard } from "../cards/OutgoingDraftCard";
-import { ResultCards, StatusCard } from "../cards/ResultCards";
+import {
+  InlineHtmlSummaryCard,
+  PlacesCard,
+  ResultCards,
+  StatusCard,
+  WeatherCard,
+} from "../cards/ResultCards";
 import { RoutineApprovalDetail } from "../cards/routine-approval-detail";
 import { ToolQuestionCard } from "../cards/ToolQuestionCard";
 import { AttachmentFile } from "../media/attachment-file";
@@ -158,6 +164,9 @@ function isOwnCardBlock(block: MessageBlock): boolean {
     block.kind === "app" ||
     block.kind === "card" ||
     block.kind === "result_cards" ||
+    block.kind === "weather" ||
+    block.kind === "places" ||
+    block.kind === "inline_html" ||
     block.kind === "tool_question"
   );
 }
@@ -181,6 +190,10 @@ function MessageBubbleBody(props: ComponentProps<typeof MessageBubbleContent>) {
       return <PageCard key={`page-${index}`} block={first} messageId={message.id} />;
     if (first.kind === "result_cards")
       return <ResultCards key={`result-cards-${index}`} block={first} />;
+    if (first.kind === "weather") return <WeatherCard key={`weather-${index}`} block={first} />;
+    if (first.kind === "places") return <PlacesCard key={`places-${index}`} block={first} />;
+    if (first.kind === "inline_html")
+      return <InlineHtmlSummaryCard key={`html-${index}`} block={first} />;
     if (first.kind === "card") return <StatusCard key={`card-${index}`} block={first} />;
     if (first.kind === "tool_question")
       return (
