@@ -155,13 +155,25 @@ export function SettingsOverlays({
   setBootstrapMe: (update: (prev: Me | null | undefined) => Me | null | undefined) => void;
   messagingEnabled: boolean;
   memoryConfig: SpaceMemoryConfig | null | undefined;
-  peerConversation: { peerBotId: string; peerBotName: string } | null;
+  peerConversation: { peerBotId: string; peerBotName: string; botId?: string } | null;
   setPeerConversation: (peer: null) => void;
   active: Bot | undefined;
-  peerBot: (botId: string) => { color: string; avatarSet?: BotAvatarSet } | undefined;
+  peerBot: (
+    botId: string,
+  ) => { name?: string; color: string; avatarSet?: BotAvatarSet } | undefined;
   openNewSpace: () => void;
 }) {
   const voiceStatusKey = queries.voice.status.queryKey();
+  const peerOriginBot =
+    active ??
+    (peerConversation?.botId
+      ? {
+          id: peerConversation.botId,
+          name: peerBot(peerConversation.botId)?.name ?? "",
+          color: peerBot(peerConversation.botId)?.color ?? FALLBACK_BOT_COLOR,
+          avatarSet: peerBot(peerConversation.botId)?.avatarSet,
+        }
+      : undefined);
   return (
     <>
       {overlay?.kind === "settings" && showSettings ? (
@@ -248,12 +260,12 @@ export function SettingsOverlays({
           onClose={() => setOverlay(null)}
         />
       ) : null}
-      {peerConversation && active ? (
+      {peerConversation && peerOriginBot ? (
         <PeerMessagesOverlay
-          botId={active.id}
-          botName={active.name}
-          botColor={active.color}
-          botAvatarSet={active.avatarSet}
+          botId={peerOriginBot.id}
+          botName={peerOriginBot.name}
+          botColor={peerOriginBot.color}
+          botAvatarSet={peerOriginBot.avatarSet}
           peerBotId={peerConversation.peerBotId}
           peerBotName={peerConversation.peerBotName}
           peerBotColor={peerBot(peerConversation.peerBotId)?.color ?? FALLBACK_BOT_COLOR}

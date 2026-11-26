@@ -19,6 +19,7 @@ export function ChatHeader({
   active,
   activeGroup,
   activeSnapshot,
+  bots,
   phoneCallsEnabled,
   meetingsEnabled,
   voiceReady,
@@ -32,6 +33,8 @@ export function ChatHeader({
   active: Bot | undefined;
   activeGroup: Group | undefined;
   activeSnapshot: ThreadSnapshot | null;
+  /** Space bots, used to display member names and live working status in group headers. */
+  bots?: Bot[];
   phoneCallsEnabled: boolean;
   meetingsEnabled?: boolean;
   /** False while the voice status loads or no voice is connected; the button then opens voice settings. */
@@ -46,6 +49,30 @@ export function ChatHeader({
   const referral = useBilling().status?.referral;
   const [inviteOpen, setInviteOpen] = useState(false);
   const macChrome = windowChromeKind(desktopBridge()) === "darwin";
+  const groupMembers = inGroup ? (activeSnapshot?.members ?? activeGroup?.members ?? []) : [];
+  const botsById = new Map((bots ?? []).map((bot) => [bot.id, bot]));
+  const workingMembers = inGroup
+    ? groupMembers
+        .map((member) => ({
+          name: member.name,
+          status: botsById.get(member.botId)?.status,
+        }))
+        .filter((member) => member.status === "working")
+    : [];
+  const groupSubtitle = !inGroup
+    ? null
+    : workingMembers.length === 1
+      ? t`${workingMembers[0]!.name} is working`
+      : workingMembers.length > 1
+        ? t`${workingMembers.length} working`
+        : groupMembers.length > 0
+          ? groupMembers.length <= 3
+            ? groupMembers.map((member) => member.name).join(", ")
+            : `${groupMembers
+                .slice(0, 2)
+                .map((member) => member.name)
+                .join(", ")} +${groupMembers.length - 2}`
+          : null;
   return (
     <div
       data-testid="chat-header"
@@ -87,12 +114,21 @@ export function ChatHeader({
               status={active.status}
             />
           ) : null}
-          <span className="min-w-0">
+          <span className="min-w-0 text-start">
             <span className="block truncate text-body-lg font-medium text-foreground" dir="auto">
               {inGroup
                 ? (activeGroup?.name ?? activeSnapshot?.groupName ?? t`Group`)
                 : active?.name}
             </span>
+            {groupSubtitle ? (
+              <span
+                data-testid="group-header-members"
+                className="block max-w-56 truncate text-caption text-muted-foreground"
+                dir="auto"
+              >
+                {groupSubtitle}
+              </span>
+            ) : null}
           </span>
         </Button>
       ) : (

@@ -108,7 +108,7 @@ export function ChatModelPicker({
       aria-label={detail ? t`Model: ${model}, ${detail}` : t`Model: ${model}`}
       aria-describedby={textOnly ? imagesHintId : undefined}
       aria-keyshortcuts={keyShortcuts}
-      className="flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-full px-2.5 text-body-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+      className="flex h-8 min-w-0 max-w-[min(14rem,42vw)] items-center gap-1.5 rounded-full px-2.5 text-body-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
     >
       <ModelMarkIcon mark={mark} className="size-3.5 shrink-0 text-foreground" />
       <span className="min-w-0 truncate text-foreground">{model}</span>

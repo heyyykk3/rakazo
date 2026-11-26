@@ -282,7 +282,7 @@ function PromptAskCard({
       className={cn(
         "w-full min-w-0 px-5 py-4",
         routineUpdate ? "max-w-md" : "max-w-xl",
-        answeredQuestion && "opacity-50 [&_button:disabled]:opacity-100",
+        answeredQuestion && "bg-muted/60 opacity-85 [&_button:disabled]:opacity-100",
       )}
     >
       <div

@@ -1151,11 +1151,11 @@ it("leaves plain questions to the composer and dims the question after answering
   expect(container.querySelectorAll("button")).toHaveLength(0);
   expect(container.querySelector("input")).toBeNull();
   expect(
-    container.querySelector('[data-testid="question-card"]')?.classList.contains("opacity-50"),
+    container.querySelector('[data-testid="question-card"]')?.classList.contains("opacity-85"),
   ).toBe(false);
   await render({ ...block, status: "answered", answer: "Paris" }, undefined, undefined, true);
   expect(
-    container.querySelector('[data-testid="question-card"]')?.classList.contains("opacity-50"),
+    container.querySelector('[data-testid="question-card"]')?.classList.contains("opacity-85"),
   ).toBe(true);
   expect(container.textContent).not.toContain("Paris");
 });

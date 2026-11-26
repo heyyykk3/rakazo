@@ -7,8 +7,17 @@ import {
   readBotsSidebarCollapsed,
   writeBotsSidebarCollapsed,
 } from "../../../lib/preferences/bots-sidebar-pref";
+import { useEventListener } from "../../../lib/use-event-listener";
 import type { SnoozedChat } from "./snoozed-chats";
 import { countUnreadChats, sidebarGroupsForSpaces } from "./space-sidebar";
+
+const MD_BREAKPOINT = 768;
+const NARROW_DESKTOP_BREAKPOINT = 1000;
+
+function isNarrowDesktopViewport() {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth >= MD_BREAKPOINT && window.innerWidth < NARROW_DESKTOP_BREAKPOINT;
+}
 
 /**
  * What the sidebar shows: whether it is collapsed, every space's chats grouped for the roster, the
@@ -37,14 +46,33 @@ export function useSidebarView({
 }) {
   const { t } = useLingui();
   // Read while rendering, so returning to chats does not animate the sidebar shut.
-  const [collapsed, setCollapsed] = useState(() => readBotsSidebarCollapsed(userId));
+  const [collapsedPref, setCollapsedState] = useState(() => readBotsSidebarCollapsed(userId));
   const [collapsedFor, setCollapsedFor] = useState(userId);
   if (collapsedFor !== userId) {
     setCollapsedFor(userId);
-    setCollapsed(readBotsSidebarCollapsed(userId));
+    setCollapsedState(readBotsSidebarCollapsed(userId));
+  }
+  const [narrowDesktop, setNarrowDesktop] = useState(isNarrowDesktopViewport);
+  // A person who explicitly expands the sidebar on a narrow window keeps it open until they resize wide again.
+  const [narrowOverride, setNarrowOverride] = useState<boolean | null>(null);
+  useEventListener(typeof window === "undefined" ? null : window, "resize", () => {
+    const nextNarrow = isNarrowDesktopViewport();
+    setNarrowDesktop((prev) => {
+      if (prev !== nextNarrow && !nextNarrow) setNarrowOverride(null);
+      return nextNarrow;
+    });
+  });
+  const collapsed = narrowDesktop ? (narrowOverride ?? true) : collapsedPref;
+  function setCollapsed(next: boolean) {
+    if (narrowDesktop) setNarrowOverride(next);
+    else setCollapsedState(next);
   }
   function setCollapsedPref(next: boolean) {
-    setCollapsed(next);
+    if (narrowDesktop) {
+      setNarrowOverride(next);
+      return;
+    }
+    setCollapsedState(next);
     writeBotsSidebarCollapsed(userId, next);
   }
   const mini = collapsed && !isMobile;

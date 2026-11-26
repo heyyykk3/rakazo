@@ -778,7 +778,7 @@ const ComposerBody = memo(function Composer({
             />
           ) : null}
           <HoldToTalkStrip talk={talk} />
-          <div className="relative min-w-[8rem] flex-1" hidden={talk.recording !== null}>
+          <div className="relative min-w-0 flex-1" hidden={talk.recording !== null}>
             <textarea
               ref={textareaRef}
               onScroll={onTextareaScroll}

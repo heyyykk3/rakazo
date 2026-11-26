@@ -439,31 +439,56 @@ function pushMessageHits(
   const title = ctx.groupId ? (ctx.groupName ?? "") : (ctx.botName ?? "");
   let messageHit = false;
   for (const block of blocks) {
-    if (block.kind !== "text") continue;
-    const text = block.text;
-    if (matchesSearchQuery(ctx.query, text)) {
+    if (block.kind === "text") {
+      const text = block.text;
+      if (matchesSearchQuery(ctx.query, text)) {
+        ctx.push({
+          kind: "message",
+          ...destination,
+          title,
+          snippet: snippetAroundMatch(text, ctx.query),
+          messageId: ctx.messageId,
+          seq: ctx.seq,
+        });
+        messageHit = true;
+      }
+      for (const url of extractLinksFromText(text)) {
+        if (matchesSearchQuery(ctx.query, url)) {
+          ctx.push({
+            kind: "link",
+            ...destination,
+            title: url,
+            snippet: snippetAroundMatch(text, ctx.query),
+            messageId: ctx.messageId,
+            seq: ctx.seq,
+            url,
+          });
+        }
+      }
+      continue;
+    }
+    const structuredText =
+      block.kind === "page"
+        ? [block.title, block.summary].filter(Boolean).join(": ")
+        : block.kind === "card"
+          ? [block.title, block.body].filter(Boolean).join(": ")
+          : block.kind === "result_cards"
+            ? [block.title, ...block.cards.flatMap((c) => [c.title, c.subtitle, c.summary])]
+                .filter(Boolean)
+                .join(" ")
+            : block.kind === "ask"
+              ? block.text
+              : null;
+    if (structuredText && matchesSearchQuery(ctx.query, structuredText)) {
       ctx.push({
         kind: "message",
         ...destination,
-        title,
-        snippet: snippetAroundMatch(text, ctx.query),
+        title: block.kind === "page" ? block.title : title,
+        snippet: snippetAroundMatch(structuredText, ctx.query),
         messageId: ctx.messageId,
         seq: ctx.seq,
       });
       messageHit = true;
-    }
-    for (const url of extractLinksFromText(text)) {
-      if (matchesSearchQuery(ctx.query, url)) {
-        ctx.push({
-          kind: "link",
-          ...destination,
-          title: url,
-          snippet: snippetAroundMatch(text, ctx.query),
-          messageId: ctx.messageId,
-          seq: ctx.seq,
-          url,
-        });
-      }
     }
   }
   if (!messageHit && matchesSearchQuery(ctx.query, JSON.stringify(blocks))) {

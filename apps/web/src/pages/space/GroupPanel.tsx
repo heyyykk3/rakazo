@@ -119,8 +119,19 @@ function MemberPicker({
                   size={32}
                   status={bot.status}
                 />
-                <span className="flex-1 text-body-lg text-foreground" dir="auto">
-                  {bot.name}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-body-lg text-foreground" dir="auto">
+                    {bot.name}
+                  </span>
+                  {bot.status === "working" ? (
+                    <span className="block text-caption text-muted-foreground">
+                      <Trans>Working</Trans>
+                    </span>
+                  ) : bot.status === "needs_you" ? (
+                    <span className="block text-caption text-warning">
+                      <Trans>Needs you</Trans>
+                    </span>
+                  ) : null}
                 </span>
               </button>
               <Checkbox

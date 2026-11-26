@@ -7,6 +7,8 @@ const COMPOSER_SINGLE_LINE_MAX_PX = 36;
 const COMPOSER_ONE_LINE_GAP_PX = 14;
 /** Narrower than the expand check so a draft at the edge cannot flip. */
 const COMPOSER_COLLAPSE_SLACK_PX = 16;
+/** Below this free inline width, move the input onto its own top row so actions and pickers never collide. */
+const COMPOSER_MIN_INLINE_FIELD_PX = 160;
 
 type ComposerLayout = { barHeight: number; fieldX: number; fieldY: number };
 
@@ -79,6 +81,18 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
       const contentHeight = measureTextareaHeight(textarea);
       textarea.style.height = `${contentHeight}px`;
       syncMirror(textarea, mirrorRef.current);
+      const attach = attachButtonRef.current;
+      const actions = composerActionsRef.current;
+      const barWidth = bar?.getBoundingClientRect().width ?? 0;
+      const besideControls =
+        attach && actions && barWidth > 0
+          ? spaceBetween(attach.getBoundingClientRect(), actions.getBoundingClientRect()) -
+            2 * COMPOSER_ONE_LINE_GAP_PX
+          : null;
+      if (besideControls !== null && besideControls < COMPOSER_MIN_INLINE_FIELD_PX) {
+        setComposerExpanded(true);
+        return;
+      }
       if (draft.length === 0) {
         setComposerExpanded(false);
         return;
@@ -87,12 +101,7 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
         setComposerExpanded(true);
         return;
       }
-      const attach = attachButtonRef.current;
-      const actions = composerActionsRef.current;
-      if (!attach || !actions) return;
-      const besideControls =
-        spaceBetween(attach.getBoundingClientRect(), actions.getBoundingClientRect()) -
-        2 * COMPOSER_ONE_LINE_GAP_PX;
+      if (besideControls === null) return;
       const heightBeside = measureTextareaHeight(
         textarea,
         besideControls - COMPOSER_COLLAPSE_SLACK_PX,
@@ -104,15 +113,24 @@ export function useComposerLayout(draft: string, hasChips: boolean) {
 
     syncHeight();
     let lastWidth = el.getBoundingClientRect().width;
+    let lastBarWidth = composerBarRef.current?.getBoundingClientRect().width ?? 0;
+    let lastActionsWidth = composerActionsRef.current?.getBoundingClientRect().width ?? 0;
     const observer = new ResizeObserver(() => {
       const textarea = textareaRef.current;
       if (!textarea) return;
       const width = textarea.getBoundingClientRect().width;
-      if (width === lastWidth) return;
+      const barWidth = composerBarRef.current?.getBoundingClientRect().width ?? 0;
+      const actionsWidth = composerActionsRef.current?.getBoundingClientRect().width ?? 0;
+      if (width === lastWidth && barWidth === lastBarWidth && actionsWidth === lastActionsWidth)
+        return;
       lastWidth = width;
+      lastBarWidth = barWidth;
+      lastActionsWidth = actionsWidth;
       syncHeight();
     });
     observer.observe(el);
+    if (composerBarRef.current) observer.observe(composerBarRef.current);
+    if (composerActionsRef.current) observer.observe(composerActionsRef.current);
     return () => observer.disconnect();
   }, [draft]);
 

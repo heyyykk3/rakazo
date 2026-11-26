@@ -160,7 +160,7 @@ export const Transcript = memo(function Transcript({
   onQuoteShortcutChange?: (handler: (() => boolean) | null) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   onJumpToMessage: (messageId: string) => void;
-  onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string }) => void;
+  onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string; botId?: string }) => void;
   memberName?: (botId: string | undefined) => string | undefined;
   peerBot: (
     botId: string,

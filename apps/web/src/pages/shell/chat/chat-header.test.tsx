@@ -143,3 +143,36 @@ it("opens the invite with both rewards and copies the link", async () => {
   expect(writeText).toHaveBeenCalledWith("https://example.test/sign-up?ref=abc");
   expect(dialog.textContent).toContain("Copied");
 });
+
+it("shows group member names and live working status in the group header", () => {
+  const members = [
+    { botId: "b1", name: "Alex", color: BOT_COLORS[0] },
+    { botId: "b2", name: "Sam", color: BOT_COLORS[1] },
+    { botId: "b3", name: "Maya", color: BOT_COLORS[2] },
+  ];
+  act(() =>
+    root.render(
+      <ChatHeader
+        inGroup
+        active={undefined}
+        activeGroup={{ id: "g1", name: "Team", members } as never}
+        activeSnapshot={null}
+        bots={[
+          { id: "b1", name: "Alex", color: BOT_COLORS[0], status: "idle" } as Bot,
+          { id: "b2", name: "Sam", color: BOT_COLORS[1], status: "working" } as Bot,
+          { id: "b3", name: "Maya", color: BOT_COLORS[2], status: "idle" } as Bot,
+        ]}
+        phoneCallsEnabled={false}
+        voiceReady={false}
+        inCall={false}
+        panelOpen={false}
+        onOpenNavigation={() => undefined}
+        onTogglePanel={() => undefined}
+        onCall={() => undefined}
+      />,
+    ),
+  );
+  expect(container.querySelector('[data-testid="group-header-members"]')?.textContent).toBe(
+    "Sam is working",
+  );
+});

@@ -495,6 +495,52 @@ export function VaultSettings({
         <p className="py-6 text-center text-body-sm text-muted-foreground">
           <Trans>No matches</Trans>
         </p>
+      ) : listQuery.isSuccess && !listQuery.isError && !items?.length ? (
+        <div
+          data-testid="vault-empty"
+          className="rounded-xl border border-dashed border-border px-5 py-7 text-center"
+        >
+          <p className="text-body font-medium text-foreground">
+            <Trans>Nothing saved yet</Trans>
+          </p>
+          <p className="mx-auto mt-1 max-w-sm text-body-sm text-muted-foreground">
+            <Trans>
+              Save logins, cards, API keys, and variables here so your bots can sign in or call
+              services when you ask.
+            </Trans>
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setEditing(newItem("login"))}
+            >
+              <Plus />
+              <Trans>Add login</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setEditing(newItem("api_key"))}
+            >
+              <Trans>Add API key</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => fileInput.current?.click()}
+            >
+              <FileUp />
+              <Trans>Import CSV</Trans>
+            </Button>
+          </div>
+        </div>
       ) : null}
       {error ? (
         <p role="alert" className="text-body-sm text-destructive">

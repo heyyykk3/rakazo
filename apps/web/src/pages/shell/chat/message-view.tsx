@@ -175,7 +175,7 @@ export const MessageView = memo(function MessageView({
     remember?: false,
   ) => Promise<void>;
   onOpenBot: (botId: string) => void;
-  onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string }) => void;
+  onOpenPeerMessages: (peer: { peerBotId: string; peerBotName: string; botId?: string }) => void;
   /** The adjacent receipts represented by this peer line. */
   peerExchange?: PeerExchange;
   hideSenderLabel?: boolean;
@@ -460,7 +460,13 @@ export const MessageView = memo(function MessageView({
                 avatarSet={peerBot(peerBotId)?.avatarSet}
                 identity={peerBotId}
                 label={label}
-                onClick={() => onOpenPeerMessages({ peerBotId, peerBotName: peer })}
+                onClick={() =>
+                  onOpenPeerMessages({
+                    peerBotId,
+                    peerBotName: peer,
+                    ...(message.groupId && message.botId ? { botId: message.botId } : {}),
+                  })
+                }
               />
             );
           }
