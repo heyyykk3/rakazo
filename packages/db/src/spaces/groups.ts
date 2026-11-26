@@ -19,7 +19,12 @@ import {
   previewFromBlocks,
   primaryActiveRun,
 } from "../threads/thread-listing.js";
-import { readStateFor, snoozedUntilFor, unreadFor } from "../threads/thread-reads.js";
+import {
+  readStateFor,
+  snoozedUntilFor,
+  unreadCountFor,
+  unreadFor,
+} from "../threads/thread-reads.js";
 import { lockSpaceForContentCreation } from "./spaces.js";
 
 type GroupRecord = {
@@ -34,7 +39,8 @@ type GroupRecord = {
   updatedAt: Date;
   thread: {
     id: string;
-    reads: Array<{ unread: boolean; snoozedUntil: Date | null }>;
+    nextMessageSeq?: number | null;
+    reads: Array<{ unread: boolean; lastReadSeq?: number | null; snoozedUntil: Date | null }>;
     messages: Array<{ blocks: unknown }>;
   } | null;
   members: Array<{
@@ -53,7 +59,8 @@ type SpaceGroupRecord = Pick<
   "id" | "spaceId" | "name" | "pinned" | "sectionId" | "updatedAt" | "members"
 > & {
   thread: {
-    reads: Array<{ unread: boolean; snoozedUntil: Date | null }>;
+    nextMessageSeq?: number | null;
+    reads: Array<{ unread: boolean; lastReadSeq?: number | null; snoozedUntil: Date | null }>;
     messages: Array<{ blocks: unknown }>;
   } | null;
 };
@@ -87,6 +94,7 @@ function mapGroup(group: GroupRecord): Group {
     threadId: group.thread.id,
     preview,
     unread: unreadFor(group.thread),
+    unreadCount: unreadCountFor(group.thread),
     snoozedUntil: snoozedUntilFor(group.thread),
     updatedAt: group.updatedAt.toISOString(),
     createdAt: group.createdAt.toISOString(),
@@ -104,6 +112,7 @@ function mapSpaceGroup(group: SpaceGroupRecord): SpaceGroup {
     members: mapGroupMembers(group.members),
     preview: previewFromBlocks(group.thread.messages[0]?.blocks),
     unread: unreadFor(group.thread),
+    unreadCount: unreadCountFor(group.thread),
     snoozedUntil: snoozedUntilFor(group.thread),
     updatedAt: group.updatedAt.toISOString(),
   };
@@ -314,7 +323,7 @@ export function createGroupRepos(prisma: PrismaClient) {
           pinned: true,
           sectionId: true,
           updatedAt: true,
-          thread: { select: { id: true, reads: readStateFor(userId) } },
+          thread: { select: { id: true, nextMessageSeq: true, reads: readStateFor(userId) } },
           members: groupMembersInclude,
         },
         orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],

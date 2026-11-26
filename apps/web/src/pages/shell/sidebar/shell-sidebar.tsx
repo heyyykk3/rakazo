@@ -28,6 +28,8 @@ import { useAppRail } from "../app-rail";
 import type { ChatMenuState } from "../chat/chat-context-menu";
 import type { Panel } from "../right-panel-state";
 import type { SettingsSection } from "../shell-overlay-url";
+import type { HiddenChat } from "./hidden-chats";
+import { HiddenChats } from "./hidden-chats";
 import { SidebarFooter } from "./sidebar-footer";
 import { SidebarHeader } from "./sidebar-header";
 import type { SidebarSearch } from "./use-sidebar-search";
@@ -81,6 +83,8 @@ export function ShellSidebar({
   chatMenu,
   roster,
   archived,
+  hiddenChats = [],
+  onUnhideChat,
   footerLogos,
   user,
   boardEnabled,
@@ -113,6 +117,8 @@ export function ShellSidebar({
   chatMenu: ChatMenuState;
   roster: ReactNode;
   archived: ReactNode;
+  hiddenChats?: HiddenChat[];
+  onUnhideChat?: (kind: "bot" | "group", id: string) => void;
   footerLogos: Array<{ name: string; logo?: string | null }>;
   user: User | undefined;
   boardEnabled: boolean;
@@ -144,6 +150,14 @@ export function ShellSidebar({
     activityFiltersId,
     activityFilterCount,
   } = search;
+  const needsYouCount =
+    bots.filter((bot) => bot.status === "waiting_input" || bot.status === "waiting_takeover")
+      .length +
+    groups.filter((group) =>
+      group.members.some(
+        (member) => member.status === "waiting_input" || member.status === "waiting_takeover",
+      ),
+    ).length;
   return (
     <>
       <button
@@ -179,6 +193,7 @@ export function ShellSidebar({
           setCreateMenuOpen={setCreateMenuOpen}
           activityMode={activityMode}
           toggleActivityMode={toggleActivityMode}
+          needsYouCount={needsYouCount}
           searchOpen={searchOpen}
           onSearch={() => {
             if (searchOpen) {
@@ -309,6 +324,14 @@ export function ShellSidebar({
               : "rk-scroll flex max-h-[40vh] shrink-0 flex-col overflow-y-auto px-2.5 pb-1"
           }
         >
+          {onUnhideChat ? (
+            <HiddenChats
+              hidden={hiddenChats}
+              showSpaceSearch={showSpaceSearch}
+              onUnhide={onUnhideChat}
+              openSpaceChat={openSpaceChat}
+            />
+          ) : null}
           {archived}
         </div>
         <div className={mini ? "hidden" : "contents"}>

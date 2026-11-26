@@ -261,8 +261,33 @@ export function SidebarRoster({
                   (item.kind === "bot" && !inGroup && active?.id === item.chat.id) ||
                   (item.kind === "group" && inGroup && activeGroup?.id === item.chat.id);
                 const compact = botsSidebarDensity === "compact";
+                const groupMembers =
+                  item.kind === "group" && item.chat.id === activeSnapshot?.groupId
+                    ? (activeSnapshot.members ?? item.chat.members)
+                    : item.kind === "group"
+                      ? item.chat.members
+                      : [];
+                const groupWaitingMember =
+                  item.kind === "group"
+                    ? groupMembers.find(
+                        (member) =>
+                          member.status === "waiting_input" || member.status === "waiting_takeover",
+                      )
+                    : undefined;
+                const groupWorkingMember =
+                  item.kind === "group"
+                    ? groupMembers.find(
+                        (member) => member.status === "working" || member.status === "running",
+                      )
+                    : undefined;
                 const workStatusLabel =
-                  item.kind === "bot" ? rosterWorkStatusLabel(item.chat.status) : null;
+                  item.kind === "bot"
+                    ? rosterWorkStatusLabel(item.chat.status)
+                    : groupWaitingMember
+                      ? t`${groupWaitingMember.name} needs you`
+                      : groupWorkingMember
+                        ? t`${groupWorkingMember.name} is working`
+                        : null;
                 const rowError =
                   item.kind === "bot" &&
                   (rosterHasUndismissedRunError(item.chat.runErrorId, dismissedRunErrorIds) ||
@@ -272,7 +297,9 @@ export function SidebarRoster({
                     ? rowError
                       ? t`Error`
                       : compactRosterStatusLabel(item.chat.status)
-                    : null;
+                    : (compact || mini || tiles) && item.kind === "group"
+                      ? workStatusLabel
+                      : null;
                 const previewLine =
                   workStatusLabel ??
                   (item.kind === "bot"
@@ -280,6 +307,9 @@ export function SidebarRoster({
                     : item.chat.preview ||
                       item.chat.members.map((member) => member.name).join(", "));
                 const rosterLine = compact ? compactStatusLabel : previewLine;
+                const unreadCount = item.chat.unread ? (item.chat.unreadCount ?? 0) : 0;
+                const unreadBadgeText =
+                  unreadCount > 99 ? "99+" : unreadCount > 0 ? String(unreadCount) : null;
                 const rowDropTarget: RosterDropTarget | null =
                   item.chat.spaceId !== bootstrapMe?.spaceId
                     ? null
@@ -295,12 +325,6 @@ export function SidebarRoster({
                 const rowSameList =
                   Boolean(draggedBotId) && groupBotIds.includes(draggedBotId ?? "");
                 const rowDropKey = `row:${item.kind}:${item.chat.id}`;
-                const groupMembers =
-                  item.kind === "group" && item.chat.id === activeSnapshot?.groupId
-                    ? (activeSnapshot.members ?? item.chat.members)
-                    : item.kind === "group"
-                      ? item.chat.members
-                      : [];
                 const avatarSize = tiles ? 56 : mini ? 40 : compact ? 28 : 38;
                 const avatar =
                   item.kind === "bot" ? (
@@ -418,11 +442,21 @@ export function SidebarRoster({
                         ) : null}
                         {item.chat.unread ? (
                           <>
-                            <span
-                              aria-hidden="true"
-                              data-roster-unread-dot
-                              className="absolute -end-0.5 top-0 size-2 rounded-full bg-unread ring-2 ring-sidebar"
-                            />
+                            {unreadBadgeText ? (
+                              <span
+                                aria-hidden="true"
+                                data-roster-unread-dot
+                                className="absolute -end-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-semibold leading-none tabular-nums text-white ring-2 ring-sidebar"
+                              >
+                                {unreadBadgeText}
+                              </span>
+                            ) : (
+                              <span
+                                aria-hidden="true"
+                                data-roster-unread-dot
+                                className="absolute -end-0.5 top-0 size-2 rounded-full bg-unread ring-2 ring-sidebar"
+                              />
+                            )}
                             <span
                               id={`roster-unread-${item.kind}-${item.chat.id}`}
                               className="sr-only"
@@ -485,11 +519,21 @@ export function SidebarRoster({
                               </span>
                             ) : null}
                             {item.chat.unread ? (
-                              <span
-                                aria-hidden="true"
-                                data-roster-unread-dot
-                                className="inline-block h-2 w-2 rounded-full bg-unread"
-                              />
+                              unreadBadgeText ? (
+                                <span
+                                  aria-hidden="true"
+                                  data-roster-unread-dot
+                                  className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-semibold leading-none tabular-nums text-white"
+                                >
+                                  {unreadBadgeText}
+                                </span>
+                              ) : (
+                                <span
+                                  aria-hidden="true"
+                                  data-roster-unread-dot
+                                  className="inline-block h-2 w-2 rounded-full bg-unread"
+                                />
+                              )
                             ) : null}
                           </div>
                         </div>

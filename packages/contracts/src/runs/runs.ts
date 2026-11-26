@@ -137,6 +137,16 @@ export const RunActivityRowSchema = z.object({
     ])
     .nullable(),
   updatedAt: z.string(),
+  /** Pending question, approval, or computer takeover waiting for the owner on an active run. */
+  pendingAsk: z
+    .object({
+      messageId: Id,
+      text: z.string(),
+      kind: z.enum(["ask", "takeover"]),
+      actions: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 export type RunActivityRow = z.infer<typeof RunActivityRowSchema>;
 

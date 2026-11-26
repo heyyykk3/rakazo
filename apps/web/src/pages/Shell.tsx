@@ -616,6 +616,8 @@ function SpaceShell({ sidebarScrollRef }: { sidebarScrollRef: Ref<HTMLDivElement
     refreshBots,
     read,
     snooze,
+    isHidden: sidebar.isHidden,
+    onToggleHidden: sidebar.setChatHidden,
     dialogs,
     openChatSettings,
     navigate,
@@ -699,6 +701,8 @@ function SpaceShell({ sidebarScrollRef }: { sidebarScrollRef: Ref<HTMLDivElement
             activeSnapshot={activeSnapshot}
           />
         }
+        hiddenChats={sidebar.hidden}
+        onUnhideChat={(kind, id) => sidebar.setChatHidden(kind, id, false)}
         archived={
           <>
             <SnoozedChats

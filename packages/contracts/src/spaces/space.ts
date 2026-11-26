@@ -22,6 +22,7 @@ export const SpaceBotSchema = ListedBotSchema.pick({
   pinned: true,
   sectionId: true,
   unread: true,
+  unreadCount: true,
   snoozedUntil: true,
   parentBotId: true,
   preview: true,
@@ -41,6 +42,7 @@ export const SpaceGroupSchema = GroupSchema.pick({
   members: true,
   preview: true,
   unread: true,
+  unreadCount: true,
   snoozedUntil: true,
   updatedAt: true,
 });

@@ -12,13 +12,26 @@ import {
 
 type Reader = { threadId: string; spaceId: string; userId: string };
 
-/** Selects one person's read state on a thread, for `unreadFor` and `snoozedUntilFor`. */
+/** Selects one person's read state on a thread, for `unreadFor`, `unreadCountFor` and `snoozedUntilFor`. */
 export function readStateFor(userId: string) {
-  return { where: { userId }, select: { unread: true, snoozedUntil: true } } as const;
+  return {
+    where: { userId },
+    select: { unread: true, lastReadSeq: true, snoozedUntil: true },
+  } as const;
 }
 
 export function unreadFor(thread: { reads: Array<{ unread: boolean }> }): boolean {
   return thread.reads[0]?.unread ?? false;
+}
+
+export function unreadCountFor(thread: {
+  nextMessageSeq?: number | null;
+  reads: Array<{ unread: boolean; lastReadSeq?: number | null }>;
+}): number {
+  const read = thread.reads[0];
+  if (!read?.unread) return 0;
+  if (typeof thread.nextMessageSeq !== "number" || typeof read.lastReadSeq !== "number") return 0;
+  return Math.max(0, thread.nextMessageSeq - 1 - read.lastReadSeq);
 }
 
 export function snoozedUntilFor(thread: {

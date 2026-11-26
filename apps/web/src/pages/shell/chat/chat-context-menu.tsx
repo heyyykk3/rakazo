@@ -104,6 +104,8 @@ export function ChatContextMenu({
   refreshBots,
   read,
   snooze,
+  isHidden,
+  onToggleHidden,
   dialogs,
   openChatSettings,
   navigate,
@@ -117,6 +119,8 @@ export function ChatContextMenu({
   refreshBots: (includeArchived?: boolean) => Promise<void>;
   read: Pick<ChatRead, "markBotRead" | "markBotUnread" | "toggleGroupUnread">;
   snooze: SnoozeChat;
+  isHidden?: (kind: "bot" | "group", id: string) => boolean;
+  onToggleHidden?: (kind: "bot" | "group", id: string, hidden: boolean) => void;
   dialogs: ShellDialogsState;
   openChatSettings: (kind: "bot" | "group", id: string) => void;
   navigate: (path: string) => void;
@@ -156,6 +160,16 @@ export function ChatContextMenu({
         onClose();
         snooze({ kind: target.kind, ...chat }, until);
       }}
+      hidden={isHidden?.(target.kind, chat.id) ?? false}
+      onToggleHidden={
+        onToggleHidden
+          ? () => {
+              const currentlyHidden = isHidden?.(target.kind, chat.id) ?? false;
+              onClose();
+              onToggleHidden(target.kind, chat.id, !currentlyHidden);
+            }
+          : undefined
+      }
       onMoveToSection={(sectionId) => {
         onClose();
         if (sectionId === chat.sectionId) return;

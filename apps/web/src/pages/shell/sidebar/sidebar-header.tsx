@@ -20,6 +20,7 @@ export function SidebarHeader({
   setCreateMenuOpen,
   activityMode,
   toggleActivityMode,
+  needsYouCount = 0,
   searchOpen = false,
   onSearch,
   setBotsSidebarCollapsedPref,
@@ -36,6 +37,7 @@ export function SidebarHeader({
   setCreateMenuOpen: (open: boolean) => void;
   activityMode: boolean;
   toggleActivityMode: () => void;
+  needsYouCount?: number;
   searchOpen?: boolean;
   onSearch?: () => void;
   setBotsSidebarCollapsedPref: (collapsed: boolean) => void;
@@ -103,15 +105,18 @@ export function SidebarHeader({
           </IconTooltip>
         ) : null}
         {mini ? null : (
-          <IconTooltip label={t`Activity`} side={labelSide}>
+          <IconTooltip
+            label={needsYouCount > 0 ? t`Activity (${needsYouCount} need you)` : t`Activity`}
+            side={labelSide}
+          >
             <Button
               variant="floating"
               size="icon"
-              aria-label={t`Activity`}
+              aria-label={needsYouCount > 0 ? t`Activity (${needsYouCount} need you)` : t`Activity`}
               aria-pressed={activityMode}
               data-activity-mode={activityMode ? "on" : "off"}
               onClick={toggleActivityMode}
-              className={`app-no-drag ${activityMode ? "text-foreground" : ""}`}
+              className={`app-no-drag relative ${activityMode ? "text-foreground" : ""}`}
             >
               {/* A filled bell marks Activity on, so on and hovered never look alike. */}
               <Bell
@@ -120,6 +125,13 @@ export function SidebarHeader({
                 fill={activityMode ? "currentColor" : "none"}
                 aria-hidden="true"
               />
+              {needsYouCount > 0 ? (
+                <span
+                  aria-hidden="true"
+                  data-testid="activity-needs-you-dot"
+                  className="absolute end-1.5 top-1.5 size-2 rounded-full bg-warning ring-2 ring-background"
+                />
+              ) : null}
             </Button>
           </IconTooltip>
         )}

@@ -7,10 +7,13 @@ import {
   botMessageContext,
   displayName,
   HELPER_RESULT_TRIGGER,
+  isSecretAskBlock,
+  plainTextFromMarkdown,
+  TAKEOVER_COMPUTER_PENDING_STATE,
   truncatePlainText,
 } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
-import { Prisma } from "@rakazo/db";
+import { Prisma, storedMessageBlocks } from "@rakazo/db";
 
 const RECENT_LIMIT = 20;
 // Background ticket work belongs on the board, not in the activity list. A background helper and
@@ -109,6 +112,14 @@ export async function listSpaceRuns(
         : [{ completedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
   });
 
+  const waitingRunIds =
+    filter === "active"
+      ? rows
+          .filter((row) => row.status === "waiting_input" || row.status === "waiting_takeover")
+          .map((row) => row.id)
+      : [];
+  const pendingAskByRun = await loadPendingAsks(prisma, waitingRunIds);
+
   return rows.map((row) => ({
     runId: row.id,
     botId: row.botId,
@@ -128,7 +139,56 @@ export async function listSpaceRuns(
       ? row.completedAt
       : row.updatedAt
     ).toISOString(),
+    ...(pendingAskByRun.has(row.id) ? { pendingAsk: pendingAskByRun.get(row.id) ?? null } : {}),
   }));
+}
+
+async function loadPendingAsks(
+  prisma: PrismaClient,
+  waitingRunIds: string[],
+): Promise<Map<string, NonNullable<RunActivityRow["pendingAsk"]>>> {
+  const result = new Map<string, NonNullable<RunActivityRow["pendingAsk"]>>();
+  if (waitingRunIds.length === 0 || typeof prisma.message?.findMany !== "function") return result;
+  const messages = await prisma.message.findMany({
+    where: { runId: { in: waitingRunIds }, role: "bot" },
+    orderBy: [{ seq: "desc" }, { id: "desc" }],
+    select: { id: true, runId: true, blocks: true },
+  });
+  for (const message of messages) {
+    if (!message.runId || result.has(message.runId)) continue;
+    const blocks = storedMessageBlocks(message);
+    for (const block of blocks) {
+      if (block.kind === "ask" && block.status !== "answered") {
+        const inlineSafe =
+          !isSecretAskBlock(block) &&
+          !block.outgoingDraft &&
+          !block.instructionUpdate &&
+          !block.routineUpdate;
+        const actions =
+          inlineSafe && block.actions?.length
+            ? block.actions
+                .filter((action) => action.id !== "agent-import")
+                .map(({ id, label }) => ({ id, label }))
+            : undefined;
+        result.set(message.runId, {
+          messageId: message.id,
+          text: promptSnippet(plainTextFromMarkdown(block.text), 140),
+          kind: "ask",
+          ...(actions?.length ? { actions } : {}),
+        });
+        break;
+      }
+      if (block.kind === "computer" && block.state === TAKEOVER_COMPUTER_PENDING_STATE) {
+        result.set(message.runId, {
+          messageId: message.id,
+          text: promptSnippet(plainTextFromMarkdown(block.text), 140),
+          kind: "takeover",
+        });
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 /** Recent lists chats keyed like `activitySections`, so one busy chat must not push the others out of the limit. */

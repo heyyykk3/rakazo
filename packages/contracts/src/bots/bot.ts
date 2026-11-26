@@ -48,6 +48,7 @@ export const BotSchema = z.object({
   sectionId: Id.nullable(),
   archivedAt: z.string().nullable(),
   unread: z.boolean(),
+  unreadCount: z.number().int().nonnegative().optional(),
   /** Hidden from the viewer's chat list until then; past, the chat has just woken. */
   snoozedUntil: z.string().nullable().optional(),
   parentBotId: Id.nullable(),

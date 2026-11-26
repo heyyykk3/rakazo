@@ -34,6 +34,7 @@ export const GroupSchema = z.object({
   threadId: Id,
   preview: z.string(),
   unread: z.boolean(),
+  unreadCount: z.number().int().nonnegative().optional(),
   /** Hidden from the viewer's chat list until then; past, the chat has just woken. */
   snoozedUntil: z.string().nullable().optional(),
   updatedAt: z.string(),

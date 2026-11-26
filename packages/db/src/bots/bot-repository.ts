@@ -38,7 +38,12 @@ import {
   threadRunStatus,
   withLatestBotRuns,
 } from "../threads/thread-listing.js";
-import { readStateFor, snoozedUntilFor, unreadFor } from "../threads/thread-reads.js";
+import {
+  readStateFor,
+  snoozedUntilFor,
+  unreadCountFor,
+  unreadFor,
+} from "../threads/thread-reads.js";
 import { chooseBotAvatar } from "./bot-avatar-choice.js";
 import { botThreadPreviews } from "./bot-previews.js";
 
@@ -91,7 +96,11 @@ function mapBot(
     memoryScope: string | null;
     createdAt: Date;
     updatedAt: Date;
-    thread: { id: string; reads: Array<{ unread: boolean; snoozedUntil: Date | null }> } | null;
+    thread: {
+      id: string;
+      nextMessageSeq?: number | null;
+      reads: Array<{ unread: boolean; lastReadSeq?: number | null; snoozedUntil: Date | null }>;
+    } | null;
     computer: { scope: string } | null;
     voiceId?: string | null;
     autoSpeak?: boolean;
@@ -131,6 +140,7 @@ function mapBot(
     sectionId: bot.sectionId,
     archivedAt: bot.archivedAt?.toISOString() ?? null,
     unread: unreadFor(bot.thread),
+    unreadCount: unreadCountFor(bot.thread),
     snoozedUntil: snoozedUntilFor(bot.thread),
     parentBotId: bot.parentBotId,
     memoryScope: bot.memoryScope as "isolated" | "shared" | null,
@@ -206,7 +216,7 @@ export function createRepos(
         sectionId: true,
         updatedAt: true,
         parentBotId: true,
-        thread: { select: { id: true, reads: readStateFor(userId) } },
+        thread: { select: { id: true, nextMessageSeq: true, reads: readStateFor(userId) } },
         runs: activeRunSelection,
       },
       orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
@@ -226,6 +236,7 @@ export function createRepos(
         pinned: bot.pinned,
         sectionId: bot.sectionId,
         unread: unreadFor(bot.thread),
+        unreadCount: unreadCountFor(bot.thread),
         snoozedUntil: snoozedUntilFor(bot.thread),
         parentBotId: bot.parentBotId,
         preview: previewFromBlocks(bot.thread.messages[0]?.blocks),

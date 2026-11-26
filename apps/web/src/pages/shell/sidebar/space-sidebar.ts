@@ -36,17 +36,18 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
   query: string,
   labels?: { pinned: string; unassigned: string },
   now = Date.now(),
+  hiddenKeys?: ReadonlySet<string>,
 ) {
   const needle = query.toLowerCase();
   const showSpaceNames = spaces.length > 1;
-  // Search still finds a snoozed chat; the list itself leaves it out until it wakes.
-  const listed = (chat: SidebarChat) =>
+  // Search still finds snoozed and hidden chats; the roster leaves them out until woken or unhidden.
+  const listed = (kind: "bot" | "group", chat: SidebarChat) =>
     needle
       ? `${chat.name} ${chat.preview ?? ""}`.toLowerCase().includes(needle)
-      : !chatSnoozed(chat, now);
+      : !chatSnoozed(chat, now) && !hiddenKeys?.has(`${kind}:${chat.id}`);
   return spaces.flatMap((space) => {
-    const visibleBots = space.bots.filter(listed);
-    const visibleGroups = space.groups.filter(listed);
+    const visibleBots = space.bots.filter((chat) => listed("bot", chat));
+    const visibleGroups = space.groups.filter((chat) => listed("group", chat));
     const grouped = groupBotsForSidebar(
       [
         ...visibleBots.map((chat) => ({ kind: "bot" as const, chat })),

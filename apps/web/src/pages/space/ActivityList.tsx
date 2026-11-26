@@ -28,6 +28,8 @@ import {
 } from "../../lib/activity-list-filters";
 import { formatRelativeTime } from "../../lib/locale/relative-time";
 import { useSpaceQueries } from "../../lib/query/query";
+import { useSpaceRpc } from "../../lib/query/space-rpc";
+import { errorText } from "../../lib/query/user-error";
 
 export function statusTone(status: RunActivityRow["status"]): string {
   if (status === "failed") return "text-destructive";
@@ -68,6 +70,7 @@ export function ActivityList({
   filtersId,
 }: ActivityListProps) {
   const { t } = useLingui();
+  const rpc = useSpaceRpc();
   const queries = useSpaceQueries();
   const live = { refetchOnWindowFocus: "always" } as const;
   const statusFilter = filters.status === "all" ? {} : { status: filters.status };
@@ -126,6 +129,15 @@ export function ActivityList({
         bot={botsById.get(run.botId)}
         detailed={detailed}
         onOpen={() => onOpenRun(run)}
+        onAnswer={async (messageId, answer) => {
+          await rpc.threads.answer({
+            ...(run.groupId ? { groupId: run.groupId } : { botId: run.botId }),
+            runId: run.runId,
+            messageId,
+            answer,
+          });
+          await Promise.all([active.refetch(), recent.refetch()]);
+        }}
       />
     ));
   const unreadCount = filtersOn ? 0 : sections.unreadGroups.length + sections.unreadBots.length;
@@ -425,19 +437,24 @@ function ActivityRow({
   bot,
   detailed,
   onOpen,
+  onAnswer,
 }: {
   run: RunActivityRow;
   bot?: Bot;
   /** Recent mixes outcomes, so its rows say how each run ended and when. */
   detailed: boolean;
   onOpen: () => void;
+  onAnswer?: (messageId: string, answer: string) => Promise<void>;
 }) {
   const { t } = useLingui();
+  const [answeringId, setAnsweringId] = useState<string | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const title = run.groupName ? `${run.botName}, ${run.groupName}` : run.botName;
   const label = runStatusLabel(run.status);
   const activityLabel = t`${title}, ${label}`;
-  const preview = activityPreview(run);
-  return (
+  const preview = run.pendingAsk?.text || activityPreview(run);
+  const inlineActions = run.pendingAsk?.actions;
+  const rowButton = (
     <button
       type="button"
       aria-label={activityLabel}
@@ -477,6 +494,42 @@ function ActivityRow({
         </div>
       </div>
     </button>
+  );
+  if (!run.pendingAsk || !inlineActions?.length || !onAnswer) return rowButton;
+  const { messageId } = run.pendingAsk;
+  return (
+    <div data-testid="activity-pending-ask" className="rounded-xl pb-1.5">
+      {rowButton}
+      <div className="mt-1 flex flex-wrap gap-1.5 ps-12 pe-2.5">
+        {inlineActions.map((action) => (
+          <Button
+            key={action.id}
+            type="button"
+            size="xs"
+            variant={action.id === "allow" ? "default" : "outline"}
+            disabled={answeringId !== null}
+            onClick={async () => {
+              setAnsweringId(action.id);
+              setAnswerError(null);
+              try {
+                await onAnswer(messageId, action.id);
+              } catch (err) {
+                setAnswerError(errorText(err, t`Could not submit this answer`));
+              } finally {
+                setAnsweringId(null);
+              }
+            }}
+          >
+            {answeringId === action.id ? <Trans>Sending…</Trans> : action.label}
+          </Button>
+        ))}
+      </div>
+      {answerError ? (
+        <p role="alert" className="mt-1 ps-12 pe-2.5 text-caption text-destructive">
+          {answerError}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

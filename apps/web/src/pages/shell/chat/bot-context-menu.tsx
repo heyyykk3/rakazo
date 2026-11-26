@@ -18,6 +18,8 @@ import {
   Clock,
   Copy,
   Eraser,
+  Eye,
+  EyeOff,
   Folder,
   FolderPlus,
   Pencil,
@@ -40,6 +42,8 @@ export function BotContextMenu({
   onToggleUnread,
   snoozed,
   onSnooze,
+  hidden = false,
+  onToggleHidden,
   onEdit,
   onDuplicate,
   onClear,
@@ -58,6 +62,9 @@ export function BotContextMenu({
   snoozed: boolean;
   /** An ISO wake time, or null to unsnooze. */
   onSnooze: (until: string | null) => void;
+  /** Hidden from the main roster without archiving or deleting. */
+  hidden?: boolean;
+  onToggleHidden?: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onClear: () => void;
@@ -149,6 +156,12 @@ export function BotContextMenu({
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
+      {onToggleHidden ? (
+        <ContextMenuItem onClick={onToggleHidden}>
+          {hidden ? <Eye /> : <EyeOff />}
+          {hidden ? t`Unhide` : t`Hide`}
+        </ContextMenuItem>
+      ) : null}
       <ContextMenuSeparator />
       <ContextMenuItem onClick={onEdit}>
         <Pencil />
