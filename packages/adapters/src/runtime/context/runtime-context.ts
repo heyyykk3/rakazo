@@ -21,6 +21,7 @@ import {
   selectContext,
   shortenToolResultText,
 } from "./context-selection.js";
+import { compactLongLoopMessages } from "./loop-checkpoint.js";
 import {
   historySnapshotEntry,
   navigationSnapshotsPrompt,
@@ -702,8 +703,15 @@ export function createRuntimeContextPolicy(
   function rebuildWithHeadroom(ctx: Context, model: Model<Api>): Prepared | undefined {
     const window = request.model.contextWindow ?? model.contextWindow;
     const reserve = outputReserve(model);
+    const compactedMessages = compactLongLoopMessages(ctx.messages);
+    const candidate =
+      compactedMessages === ctx.messages ? ctx : { ...ctx, messages: compactedMessages };
     try {
-      return rebuild(ctx, model, reserve + Math.floor((window - reserve) * (1 - REBUILD_HEADROOM)));
+      return rebuild(
+        candidate,
+        model,
+        reserve + Math.floor((window - reserve) * (1 - REBUILD_HEADROOM)),
+      );
     } catch (error) {
       if (error instanceof ContextBudgetError) return undefined;
       throw error;

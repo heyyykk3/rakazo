@@ -34,6 +34,10 @@ describe("built-in skills", () => {
         name: "Rakazo",
         description: "What Rakazo is and how to use it: chat apps, computers, billing, hosting",
       },
+      {
+        name: "Mac Apps",
+        description: "Read and act on macOS Mail, Notes, Reminders, Calendar, and Messages",
+      },
     ]);
   });
 

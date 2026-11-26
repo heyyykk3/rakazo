@@ -565,6 +565,7 @@ describeWithDatabase("API authorization and resource isolation", () => {
       ["pages/rename"],
       ["pages/setVisibility"],
       ["pages/pin"],
+      ["pages/create"],
       ["pages/remove"],
       ["usage/list"],
       ["usage/summary"],
