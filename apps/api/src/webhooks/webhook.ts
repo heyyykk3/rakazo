@@ -1,4 +1,5 @@
 import { SecretStoreUnavailableError } from "@rakazo/adapter-kit";
+import { formatPresetWebhookSummary, verifyPresetWebhookSignature } from "@rakazo/adapters";
 import { hasValidBearerToken } from "@rakazo/core/node/secrets-guard";
 import type { Hono } from "hono";
 import { readBoundedBytes } from "../http/http-body.js";
@@ -71,7 +72,11 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
             signature: c.req.header("svix-signature"),
           };
     const hasKey = hasValidBearerToken(c.req.header("authorization"), target.expected);
-    if (!hasKey && !hasValidWebhookSignature(signed, target.expected, bytes)) {
+    const readHeader = (name: string) => c.req.header(name);
+    const presetSig = verifyPresetWebhookSignature(readHeader, target.expected, bytes);
+    const hasSignature =
+      presetSig?.verified === true || hasValidWebhookSignature(signed, target.expected, bytes);
+    if (!hasKey && !hasSignature) {
       return unauthorized();
     }
     const raw = new TextDecoder().decode(bytes);
@@ -84,6 +89,9 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
         userId: target.bot.userId,
         active: true,
         webhookEnabled: true,
+        ...(presetSig
+          ? { OR: [{ webhookPreset: null }, { webhookPreset: presetSig.preset }] }
+          : { webhookPreset: null }),
       },
       select: {
         id: true,
@@ -101,7 +109,10 @@ export function mountWebhookHttpRoutes(app: Hono, deps: WebhookDeps) {
     }
 
     const payload = parseWebhookPayload(raw, c.req.header("content-type"));
-    const eventPrompt = formatWebhookPrompt(payload);
+    const presetSummary = formatPresetWebhookSummary(readHeader, payload);
+    const eventPrompt = presetSummary
+      ? `${presetSummary}\n\n${formatWebhookPrompt(payload)}`
+      : formatWebhookPrompt(payload);
 
     // A payload id often names the resource, not the delivery, so only byte-identical retries collapse.
     // A signed delivery is deduplicated on the id its signature covers, never on a header a replay could change.

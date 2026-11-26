@@ -30,6 +30,9 @@ export function routineTriggerSummary(
   }
   // Schedules first: they say when it runs, so they matter most when the line is cut off.
   const parts: string[] = routine.crons.map((cron) => formatCron(cron, labels));
+  if (routine.windowMinutes && routine.windowMinutes > 0 && parts.length > 0) {
+    parts.push(t`within ${routine.windowMinutes}m`);
+  }
   if (routine.watch) parts.push(t`When something changes`);
   if (routine.endsAt) {
     const end = formatRoutineEnd(routine.endsAt, routine.timezone, locale);

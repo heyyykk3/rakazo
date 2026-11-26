@@ -24,6 +24,29 @@ const scheduleCreateProperties = {
     type: "boolean",
     description: "Run as a turn in this chat.",
   },
+  windowMinutes: {
+    type: "integer",
+    minimum: 0,
+    maximum: 180,
+    description:
+      "Optional flexible scheduling window in minutes (e.g. 60 spreads an 8am routine anywhere between 8 and 9am).",
+  },
+  webhookPreset: {
+    type: "string",
+    enum: ["linear", "sentry", "pagerduty"],
+    description: "Optional signed webhook trigger preset for external issue or incident webhooks.",
+  },
+  deliverTo: {
+    type: "object",
+    description: "Optional external delivery destination when the routine reports news.",
+    properties: {
+      kind: { type: "string", enum: ["chat", "email", "channel"] },
+      to: { type: "string", description: "Email address when kind is email." },
+      provider: { type: "string", description: "Messaging app name when kind is channel." },
+      channelId: { type: "string", description: "Channel or thread ID when kind is channel." },
+    },
+    required: ["kind"],
+  },
 };
 
 const scheduleTimingNames = [...SCHEDULE_TIMING_FIELDS, "watch"] as const;

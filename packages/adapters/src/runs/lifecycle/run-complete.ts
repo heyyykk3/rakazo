@@ -19,6 +19,7 @@ import {
 } from "../../memory/conversation-memory.js";
 import { returnBotMessageOutcome } from "../../messaging/bot-messages.js";
 import { clearRoutineBackoff } from "../../routines/routine-backoff.js";
+import { deliverRoutineOutcome } from "../../routines/routine-delivery.js";
 import { deleteSpentRoutine } from "../../routines/routine-end.js";
 import { isStrategicInitiativeRun } from "../../routines/strategic-initiative.js";
 import {
@@ -160,6 +161,13 @@ export async function completeRun(ctx: RunContext) {
   ctx.stopHeartbeatAfterCompletion();
   if (run.trigger === "routine" && run.routineId) {
     await clearRoutineBackoff(deps, { routineId: run.routineId, userId: run.userId });
+    if (text.trim()) {
+      await deliverRoutineOutcome(deps, {
+        routineId: run.routineId,
+        botName: bot.name,
+        text,
+      });
+    }
     await deleteSpentRoutine(deps, {
       spaceId: run.spaceId,
       routineId: run.routineId,

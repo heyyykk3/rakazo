@@ -525,6 +525,27 @@ export function nextCronDateAcross(crons: string[], from: Date, timezone = "UTC"
   return earliest;
 }
 
+/**
+ * Spreads a scheduled run deterministically inside `[base, base + windowMinutes)` using FNV-1a,
+ * so routines sharing a flexible window (e.g. "any time 8-9am") do not all wake at once.
+ */
+export function applyRoutineWindow(
+  base: Date,
+  windowMinutes: number | null | undefined,
+  seed: string,
+): Date {
+  if (!windowMinutes || windowMinutes <= 0) return base;
+  const clampedMinutes = Math.min(180, Math.floor(windowMinutes));
+  const key = `${seed}:${base.toISOString()}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  const offsetSeconds = (hash >>> 0) % (clampedMinutes * 60);
+  return new Date(base.getTime() + offsetSeconds * 1_000);
+}
+
 // Throws on the first malformed recurring cron instead of skipping it, so a persisted
 // routine never keeps a bad entry that silently never fires.
 export function nextCronDateAcrossStrict(

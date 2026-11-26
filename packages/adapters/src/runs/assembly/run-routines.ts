@@ -9,6 +9,7 @@ import {
 import { ROUTINE_WATCH_DEFAULT_MINUTES } from "@rakazo/contracts";
 import {
   ACTIVE_RUN_STATUSES,
+  applyRoutineWindow,
   displayName,
   expandSkillReferencesInPrompt,
   isOneShotRoutineCrons,
@@ -132,12 +133,17 @@ async function notifyFailedRoutineRun(
 
 /** The occurrence after `scheduledAt` for a timed routine; null once a one-time one has fired. */
 function nextScheduledRunAt(
-  routine: { crons: string[]; timezone: string },
+  routine: { id?: string; crons: string[]; timezone: string; windowMinutes?: number },
   scheduledAt: Date,
 ): Date | null {
-  return isOneShotRoutineCrons(routine.crons)
-    ? null
-    : nextRoutineRunDateAcross(routine.crons, scheduledAt, new Date(Date.now()), routine.timezone);
+  if (isOneShotRoutineCrons(routine.crons)) return null;
+  const base = nextRoutineRunDateAcross(
+    routine.crons,
+    scheduledAt,
+    new Date(Date.now()),
+    routine.timezone,
+  );
+  return base ? applyRoutineWindow(base, routine.windowMinutes, routine.id ?? "routine") : null;
 }
 
 export async function wakeRoutine(deps: ExecutorDeps, routineId: string, scheduledFor: string) {

@@ -13,8 +13,13 @@ import {
   routineRunModelPin,
 } from "@rakazo/adapters";
 import type { Actor, CreateRoutineInput, Routine } from "@rakazo/contracts";
-import { canonicalPiProviderId, RoutineEmailSendersSchema } from "@rakazo/contracts";
 import {
+  canonicalPiProviderId,
+  RoutineDeliverToSchema,
+  RoutineEmailSendersSchema,
+} from "@rakazo/contracts";
+import {
+  applyRoutineWindow,
   ClientError,
   displayName,
   hasMixedOneShotSchedule,
@@ -23,7 +28,7 @@ import {
   routineScheduleDelayed,
 } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
-import { IsolationError } from "@rakazo/db";
+import { IsolationError, readJsonColumn } from "@rakazo/db";
 import type { RouterDeps } from "../router.js";
 import type { RouterContext } from "../routes/context.js";
 
@@ -44,7 +49,11 @@ export function routineNextRunAt(input: CreateRoutineInput): Date | null {
   // Validate every recurring cron even when inactive; @once and webhook-only have no next date.
   let nextRunAt: Date | null = null;
   if (input.crons.length > 0 && !isOneShotRoutineCrons(input.crons)) {
-    const computedNextRunAt = nextRoutineDate(input.crons, input.timezone);
+    const computedNextRunAt = applyRoutineWindow(
+      nextRoutineDate(input.crons, input.timezone),
+      input.windowMinutes,
+      `${input.botId}:${input.name}`,
+    );
     nextRunAt = input.active ? computedNextRunAt : null;
   }
   // A change trigger takes its first reading right away; that reading is the baseline.
@@ -66,6 +75,7 @@ export function routineRowData(actor: Actor, input: CreateRoutineInput, nextRunA
     inChat: input.inChat && !input.watch,
     active: input.active,
     webhookEnabled: input.webhookEnabled,
+    webhookPreset: input.webhookPreset ?? null,
     githubEnabled: input.githubEnabled,
     messageProvider: input.messageProvider,
     emailSenders: input.emailSenders,
@@ -73,6 +83,8 @@ export function routineRowData(actor: Actor, input: CreateRoutineInput, nextRunA
     modelId: input.modelId,
     thinkingLevel: input.thinkingLevel,
     ...(input.watch ? { watch: input.watch as Prisma.InputJsonValue } : {}),
+    windowMinutes: input.windowMinutes ?? 0,
+    ...(input.deliverTo ? { deliverTo: input.deliverTo as Prisma.InputJsonValue } : {}),
     nextRunAt,
     endsAt: input.endsAt ? new Date(input.endsAt) : null,
   };
@@ -114,8 +126,19 @@ export function mapRoutine(row: {
   endsAt: Date | null;
   pausedReason?: string | null;
   resumeAt?: Date | null;
+  windowMinutes?: number | null;
+  webhookPreset?: string | null;
+  deliverTo?: unknown;
   createdAt: Date;
 }): Routine {
+  const deliverTo = row.deliverTo
+    ? readJsonColumn(
+        RoutineDeliverToSchema.nullable(),
+        row.deliverTo,
+        { table: "Routine", column: "deliverTo", id: row.id },
+        { fallback: null },
+      )
+    : null;
   return {
     id: row.id,
     botId: row.botId,
@@ -140,6 +163,9 @@ export function mapRoutine(row: {
     endsAt: row.endsAt?.toISOString() ?? null,
     pausedReason: row.pausedReason ?? null,
     resumeAt: row.resumeAt?.toISOString() ?? null,
+    ...(row.windowMinutes ? { windowMinutes: row.windowMinutes } : {}),
+    ...(row.webhookPreset ? { webhookPreset: row.webhookPreset } : {}),
+    ...(deliverTo ? { deliverTo } : {}),
     scheduleDelayed: routineScheduleDelayed({
       active: row.active,
       nextRunAt: row.nextRunAt?.getTime() ?? null,

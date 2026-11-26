@@ -43,6 +43,25 @@ export const ROUTINE_TRIGGER_REQUIRED =
 export const RoutineEmailSendersSchema = z.enum(["owner", "domain"]);
 export type RoutineEmailSenders = z.infer<typeof RoutineEmailSendersSchema>;
 
+export const ROUTINE_WINDOW_MAX_MINUTES = 180;
+
+export const RoutineDeliverToSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("chat") }),
+  z.strictObject({ kind: z.literal("email"), to: z.email().max(254) }),
+  z.strictObject({
+    kind: z.literal("channel"),
+    provider: z.string().min(1).max(50),
+    channelId: z.string().min(1).max(200),
+  }),
+]);
+export type RoutineDeliverTo = z.infer<typeof RoutineDeliverToSchema>;
+
+export const RoutineWebhookPresetSchema = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z0-9_-]+$/i);
+
 export const RoutineSchema = z.object({
   id: Id,
   botId: Id,
@@ -76,6 +95,12 @@ export const RoutineSchema = z.object({
   endsAt: z.string().nullable().default(null),
   pausedReason: z.string().nullable().optional(),
   resumeAt: z.string().nullable().optional(),
+  /** Flexible scheduling window in minutes (0 = exact time). Absent on older servers. */
+  windowMinutes: z.number().int().min(0).max(ROUTINE_WINDOW_MAX_MINUTES).optional(),
+  /** Optional webhook trigger preset identifier (resolved by server adapters). */
+  webhookPreset: RoutineWebhookPresetSchema.nullable().optional(),
+  /** Optional delivery target beyond the routine's own chat. */
+  deliverTo: RoutineDeliverToSchema.nullable().optional(),
   /** Computed by the server; absent on older servers. Not a worker-health diagnosis. */
   scheduleDelayed: z.boolean().optional(),
   createdAt: z.string(),
@@ -124,6 +149,9 @@ export const CreateRoutineInput = z
     thinkingLevel: ThinkingLevelSchema.nullable().default(null),
     watch: RoutineWatchSchema.nullable().default(null),
     endsAt: IsoDate.nullable().default(null),
+    windowMinutes: z.number().int().min(0).max(ROUTINE_WINDOW_MAX_MINUTES).optional(),
+    webhookPreset: RoutineWebhookPresetSchema.nullable().optional(),
+    deliverTo: RoutineDeliverToSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     routineModelIssues(value, ctx);

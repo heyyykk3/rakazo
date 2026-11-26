@@ -1686,6 +1686,7 @@ model Routine {
   /// another when the owner pairs or unpairs a computer.
   computerPromptHash String?
   webhookEnabled Boolean   @default(false)
+  webhookPreset  String?
   githubEnabled  Boolean   @default(false)
   messageProvider String?
   emailSenders   String?
@@ -1696,6 +1697,10 @@ model Routine {
   watchState     Json?
   /// Persistent JSON cursor/memory saved by routine_state_set across runs.
   state          Json?
+  /// Flexible timing window in minutes (0 = exact schedule, >0 spreads run within window).
+  windowMinutes  Int       @default(0)
+  /// Optional external delivery target ({ kind: "chat" | "email" | "channel", ... }).
+  deliverTo      Json?
   lastRunAt      DateTime?
   nextRunAt      DateTime?
   endsAt         DateTime?

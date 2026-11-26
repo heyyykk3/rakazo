@@ -1,14 +1,18 @@
 import type { ConnectorProvider, JobPublisher, SecretStore } from "@rakazo/adapter-kit";
 import { routineJobKey, routineWakeupJob } from "@rakazo/adapter-kit";
-import type { ChatPreferencesPatch, RoutineWatch } from "@rakazo/contracts";
+import type { ChatPreferencesPatch, RoutineDeliverTo, RoutineWatch } from "@rakazo/contracts";
 import {
   ROUTINE_NAME_MAX_LENGTH,
   ROUTINE_WATCH_MIN_MINUTES,
+  ROUTINE_WINDOW_MAX_MINUTES,
+  RoutineDeliverToSchema,
   RoutineEmailSendersSchema,
   RoutineWatchSchema,
+  RoutineWebhookPresetSchema,
   TimeZoneSchema,
 } from "@rakazo/contracts";
 import {
+  applyRoutineWindow,
   cronFromPreset,
   isOneShotRoutineCron,
   isOneShotRoutineCrons,
@@ -623,6 +627,9 @@ export async function createScheduleFromTool(
     prompt: string;
     inChat?: boolean;
     timezone?: string;
+    windowMinutes?: number;
+    webhookPreset?: string | null;
+    deliverTo?: RoutineDeliverTo | null;
     schedule: Record<string, unknown>;
     /** The tool's `on`: events that start the routine besides its timing, or instead of it. */
     on?: unknown;
@@ -707,7 +714,14 @@ export async function createScheduleFromTool(
       events: hasRoutineEvents(events),
     });
     if ("error" in end) return { error: end.error } as const;
-    wakeAt = eventsOnly ? undefined : resolved.nextRunAt;
+    const clampedWindow =
+      typeof input.windowMinutes === "number" && Number.isFinite(input.windowMinutes)
+        ? Math.max(0, Math.min(ROUTINE_WINDOW_MAX_MINUTES, Math.floor(input.windowMinutes)))
+        : 0;
+    const scheduledNextRunAt = eventsOnly
+      ? null
+      : applyRoutineWindow(resolved.nextRunAt, clampedWindow, `${routineBotId}:${name}`);
+    wakeAt = scheduledNextRunAt ?? undefined;
     return client.routine.create({
       data: {
         spaceId: input.spaceId,
@@ -722,7 +736,10 @@ export async function createScheduleFromTool(
         inChat: input.inChat ?? false,
         active: true,
         ...events,
-        nextRunAt: eventsOnly ? null : resolved.nextRunAt,
+        ...(input.webhookPreset ? { webhookPreset: input.webhookPreset } : {}),
+        ...(clampedWindow > 0 ? { windowMinutes: clampedWindow } : {}),
+        ...(input.deliverTo ? { deliverTo: input.deliverTo as Prisma.InputJsonValue } : {}),
+        nextRunAt: scheduledNextRunAt,
         endsAt: end.endsAt,
       },
     });
@@ -786,11 +803,25 @@ export async function createScheduleFromTool(
 
 /** `schedule_create` tool arguments as createScheduleFromTool takes them. */
 export function scheduleCreateFields(args: Record<string, unknown>) {
+  const windowMinutes =
+    typeof args.windowMinutes === "number" && Number.isFinite(args.windowMinutes)
+      ? Math.max(0, Math.min(ROUTINE_WINDOW_MAX_MINUTES, Math.floor(args.windowMinutes)))
+      : undefined;
+  const presetParsed = isScheduleValueProvided(args.webhookPreset)
+    ? RoutineWebhookPresetSchema.safeParse(String(args.webhookPreset).trim().toLowerCase())
+    : undefined;
+  const deliverParsed =
+    args.deliverTo !== undefined && args.deliverTo !== null
+      ? RoutineDeliverToSchema.safeParse(args.deliverTo)
+      : undefined;
   return {
     name: String(args.name ?? ""),
     prompt: String(args.prompt ?? ""),
     inChat: args.inChat === true,
     timezone: args.timezone ? String(args.timezone) : undefined,
+    ...(windowMinutes !== undefined ? { windowMinutes } : {}),
+    ...(presetParsed?.success ? { webhookPreset: presetParsed.data } : {}),
+    ...(deliverParsed?.success ? { deliverTo: deliverParsed.data } : {}),
     schedule: compactScheduleInput({ ...scheduleTimingArgs(args), watch: args.watch }),
     on: isScheduleValueProvided(args.on) ? args.on : undefined,
     endAt: isScheduleValueProvided(args.endAt) ? String(args.endAt) : undefined,
