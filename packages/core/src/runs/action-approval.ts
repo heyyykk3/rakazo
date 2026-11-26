@@ -9,107 +9,13 @@ import { BUILTIN_TOOL_NAMES } from "@rakazo/contracts";
 export { isSecretAskBlock } from "../asks/ask-kind.js";
 
 import { humanizeToolName } from "../messages/events.js";
-
-const APPROVAL_EXEMPT_TOOLS = new Set([
-  "computer_observe",
-  "computer_act",
-  "browser_navigate",
-  "browser_snapshot",
-  "browser_act",
-  "list_files",
-  "user_computer_list",
-  "read_file",
-  "read_history",
-  "search_history",
-  "write_file",
-  "shell",
-  "open_path",
-  "launch_app",
-  "remember",
-  "request_takeover",
-  "request_secret",
-  "generate_secret",
-  "run_subagent",
-  "spawn_bot",
-  "schedule_create",
-  "schedule_list",
-  "schedule_update",
-  "schedule_cancel",
-  "list_fleet",
-  "organize_bot",
-  // The wallet owner approves every purchase in the wallet itself; a card here would ask twice.
-  "request_purchase",
-]);
-
-/**
- * Built-ins that only look, or only speak to the owner: free even when outside text started the
- * run. Anything else, new tools included, is gated there (see outsideRunToolRequiresApproval).
- */
-const OUTSIDE_RUN_SAFE_BUILTIN_TOOLS = new Set([
-  "ask_user",
-  "attach_file",
-  "browser_snapshot",
-  "cloud_agent_status",
-  "computer_observe",
-  "list_files",
-  "user_computer_list",
-  "list_fleet",
-  "list_secrets",
-  "message_user",
-  "purchase_status",
-  "react",
-  "read_email",
-  "read_file",
-  "read_history",
-  "recall_memory",
-  "reflect_memory",
-  "request_takeover",
-  "run_subagent",
-  "schedule_list",
-  "scratchpad_list",
-  "search_history",
-  "service_search",
-  "show_cards",
-  "show_status",
-  "skill_read",
-  "task_catalog",
-  "web_fetch",
-  "web_search",
-]);
-
-const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
-  "create_calendar_event",
-  "create_reminder",
-  "complete_reminder",
-  "generate_image",
-  "generate_video",
-  "service_call",
-  "archive_bot",
-  "secret_request",
-  "forget_secret",
-  "forget_memory",
-  "delete_shared_memory",
-  "skill_delete",
-  "remove_mcp_server",
-  // Permanent, and only for mail the bot received; its owner may still want it.
-  "delete_email",
-  "cloud_agent_launch",
-  "cloud_agent_reply",
-  "cloud_agent_cancel",
-  "user_computer_shell",
-  "user_computer_observe",
-  "user_computer_act",
-  "feedback",
-  "send_email",
-  "create_space",
-  "set_child_bot_model",
-]);
-const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
-  // Permanent: the owner sees the exact address before it is theirs for good.
-  "claim_email_address",
-  "respond_agent_connection",
-  "set_child_instructions",
-]);
+import {
+  APPROVAL_EXEMPT_TOOLS,
+  APPROVAL_REQUIRED_BUILTIN_TOOLS,
+  EXPLICIT_APPROVAL_BUILTIN_TOOLS,
+  OUTSIDE_RUN_SAFE_BUILTIN_TOOLS,
+  OWN_STATE_RESULT_TOOLS,
+} from "./action-approval-tools.js";
 
 const READ_ONLY_CONNECTOR_PATTERN = /(^|[_-])(get|list|search|find|read)([_-]|$)/i;
 /** App slug before a hyphenated action: letters and digits, with at most one underscore. */
@@ -295,52 +201,6 @@ export function approvalCardExpires(trigger: string): boolean {
  * (pages, search hits, files, connector data, the screen, shell output, other bots) can carry text
  * an attacker wrote, and taints the run. New tools taint by default.
  */
-const OWN_STATE_RESULT_TOOLS = new Set([
-  "ask_user",
-  // Only confirms what the bot itself sent.
-  "send_email",
-  "connect_app",
-  "attach_file",
-  // Only confirms the bot's own address.
-  "claim_email_address",
-  "delete_email",
-  "end_call",
-  "feedback",
-  "generate_secret",
-  "list_fleet",
-  "list_secrets",
-  "message_user",
-  "react",
-  "read_history",
-  "recall_memory",
-  "reflect_memory",
-  "remember",
-  "render_plot",
-  "request_secret",
-  "save_memory",
-  "save_page",
-  "delete_shared_memory",
-  "schedule_cancel",
-  "schedule_create",
-  "schedule_list",
-  "schedule_update",
-  "scratchpad_add",
-  "scratchpad_complete",
-  "scratchpad_list",
-  "scratchpad_remove",
-  "scratchpad_update",
-  "search_history",
-  "show_cards",
-  "show_status",
-  "skill_create",
-  "skill_delete",
-  "skill_read",
-  "skill_update",
-  "task_catalog",
-  "update_preferences",
-  "write_file",
-]);
-
 export function toolResultTaintsRun(toolName: string): boolean {
   return !OWN_STATE_RESULT_TOOLS.has(toolName);
 }

@@ -1,6 +1,9 @@
 import { redactSecrets } from "@rakazo/core";
+import { readJsonColumn } from "@rakazo/db";
+import * as z from "zod";
 import type { FleetCardSummary } from "../../approvals/approval-ask.js";
 import { approvalDetailLength, MAX_APPROVAL_SUMMARY_LENGTH } from "../../approvals/approval-ask.js";
+import { redactConnectorPayload } from "../../integrations/connector-safety.js";
 import {
   desktopGuardApplies,
   desktopGuardRefusalMessage,
@@ -256,6 +259,61 @@ export const taskTools: ToolHandlers = {
     });
     return call.finish(cancelled);
   },
+  async routine_state_get(ctx) {
+    const { deps, run } = ctx;
+    if (!run.routineId) return { error: "Only a routine run has saved routine state." };
+    const row = await deps.prisma.routine.findFirst({
+      where: { id: run.routineId, spaceId: run.spaceId },
+      select: { id: true, state: true },
+    });
+    if (!row) return { error: "Routine not found." };
+    const state = readJsonColumn(
+      RoutineStateRecordSchema,
+      row.state,
+      { table: "routines", column: "state", id: row.id },
+      { fallback: {} },
+    );
+    return { state };
+  },
+  async routine_state_set(ctx, call) {
+    const { deps, run } = ctx;
+    if (!run.routineId) {
+      return call.finish({ error: "Only a routine run can save routine state." });
+    }
+    const patch = RoutineStateRecordSchema.safeParse(call.args.state);
+    if (!patch.success) {
+      return call.finish({ error: "state must be a JSON object." });
+    }
+    const row = await deps.prisma.routine.findFirst({
+      where: { id: run.routineId, spaceId: run.spaceId },
+      select: { id: true, state: true },
+    });
+    if (!row) return call.finish({ error: "Routine not found." });
+    const existing =
+      call.args.replace === true
+        ? {}
+        : readJsonColumn(
+            RoutineStateRecordSchema,
+            row.state,
+            { table: "routines", column: "state", id: row.id },
+            { fallback: {} },
+          );
+    const merged = redactConnectorPayload({ ...existing, ...patch.data }, ctx.secrets) as Record<
+      string,
+      unknown
+    >;
+    const serialized = JSON.stringify(merged);
+    if (Buffer.byteLength(serialized, "utf8") > ROUTINE_STATE_MAX_BYTES) {
+      return call.finish({
+        error: `Routine state exceeds the ${ROUTINE_STATE_MAX_BYTES}-byte limit.`,
+      });
+    }
+    await deps.prisma.routine.updateMany({
+      where: { id: row.id, spaceId: run.spaceId },
+      data: { state: JSON.parse(serialized) },
+    });
+    return call.finish({ ok: true, state: merged });
+  },
   async skill_read(ctx, call) {
     const { deps, run } = ctx;
     const { args } = call;
@@ -332,6 +390,9 @@ export const taskTools: ToolHandlers = {
   },
 };
 
+const RoutineStateRecordSchema = z.record(z.string(), z.unknown());
+const ROUTINE_STATE_MAX_BYTES = 32_768;
+
 function routinesTarget(ctx: RunContext, name: string, args: Record<string, unknown>) {
   const { deps, fleetRun, bot, thread } = ctx;
   return findRoutinesTarget({ prisma: deps.prisma, fleetRun, botId: bot.id, thread }, name, args);
@@ -348,6 +409,10 @@ function scheduleUpdateInput(args: Record<string, unknown>) {
     prompt: isScheduleValueProvided(args.prompt) ? String(args.prompt) : undefined,
     inChat: typeof args.inChat === "boolean" ? args.inChat : undefined,
     active: typeof args.active === "boolean" ? args.active : undefined,
+    pausedReason: isScheduleValueProvided(args.pausedReason)
+      ? String(args.pausedReason)
+      : undefined,
+    resumeAt: isScheduleValueProvided(args.resumeAt) ? String(args.resumeAt) : undefined,
     timezone: isScheduleValueProvided(args.timezone) ? String(args.timezone) : undefined,
     schedule: compactScheduleInput(scheduleTimingArgs(args)),
     everyMinutes: isScheduleValueProvided(args.everyMinutes) ? args.everyMinutes : undefined,

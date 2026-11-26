@@ -50,6 +50,7 @@ export const READ_ONLY_AGENT_TOOLS = new Set([
   "recall_memory",
   "reflect_memory",
   "schedule_list",
+  "routine_state_get",
   "scratchpad_list",
   "board_tickets",
   "ticket_get",
@@ -254,6 +255,7 @@ export function selectBuiltinToolsForRun(options: {
       (options.ticketBoardEnabled ||
         (tool.name !== "board_tickets" && !tool.name.startsWith("ticket_"))) &&
       (!isBackgroundRunTrigger(options.trigger) || !BACKGROUND_DROPPED_TOOL_NAMES.has(tool.name)) &&
+      (options.trigger === "routine" || !tool.name.startsWith("routine_state_")) &&
       (options.voiceCall || tool.name !== "end_call") &&
       (emailMailbox || !EMAIL_INBOX_TOOL_NAMES.has(tool.name)) &&
       ((emailMailbox && options.emailSend) || tool.name !== "send_email") &&

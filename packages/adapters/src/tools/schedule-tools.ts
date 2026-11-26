@@ -1021,6 +1021,8 @@ export async function listSchedulesFromTool(
       crons: row.crons,
       inChat: row.inChat,
       active: row.active,
+      ...(row.pausedReason ? { pausedReason: row.pausedReason } : {}),
+      ...(row.resumeAt ? { resumeAt: row.resumeAt.toISOString() } : {}),
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
       oneShot: isOneShotRoutineCrons(row.crons),
       ...describeRoutineTiming(row),
@@ -1096,6 +1098,8 @@ export async function updateScheduleFromTool(
     prompt?: string;
     inChat?: boolean;
     active?: boolean;
+    pausedReason?: string;
+    resumeAt?: string;
     timezone?: string;
     schedule: Record<string, unknown>;
     /** A watch's new check interval, in minutes. */
@@ -1204,11 +1208,31 @@ export async function updateScheduleFromTool(
     prompt === undefined &&
     inChat === undefined &&
     input.active === undefined &&
+    input.pausedReason === undefined &&
+    input.resumeAt === undefined &&
     input.on === undefined &&
     input.endAt === undefined
   ) {
     return { error: "Nothing to update." };
   }
+  let parsedResumeAt: Date | null | undefined;
+  if (input.resumeAt !== undefined) {
+    const trimmed = input.resumeAt.trim();
+    if (trimmed.toLowerCase() === "none") {
+      parsedResumeAt = null;
+    } else {
+      const date = new Date(trimmed);
+      if (Number.isNaN(date.getTime())) {
+        return { error: "resumeAt must be a valid ISO-8601 timestamp or 'none'." };
+      }
+      if (date.getTime() <= Date.now()) {
+        return { error: "resumeAt must be in the future." };
+      }
+      parsedResumeAt = date;
+    }
+  }
+  const parsedPausedReason =
+    input.pausedReason !== undefined ? input.pausedReason.trim().slice(0, 240) || null : undefined;
   if (retime && existing.watch != null) {
     return { error: WATCH_RETIME_ERROR };
   }
@@ -1382,6 +1406,14 @@ export async function updateScheduleFromTool(
       ...(watchChanged && watch ? { watch: watch as Prisma.InputJsonValue } : {}),
       ...(eventsChanged ? events : {}),
       ...(endChanged ? { endsAt } : {}),
+      ...(active
+        ? !existing.active || existing.pausedReason || existing.resumeAt
+          ? { pausedReason: null, resumeAt: null }
+          : {}
+        : {
+            ...(parsedPausedReason !== undefined ? { pausedReason: parsedPausedReason } : {}),
+            ...(parsedResumeAt !== undefined ? { resumeAt: parsedResumeAt } : {}),
+          }),
     },
   });
   if (count === 0) {

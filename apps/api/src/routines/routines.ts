@@ -112,6 +112,8 @@ export function mapRoutine(row: {
   lastRunAt: Date | null;
   nextRunAt: Date | null;
   endsAt: Date | null;
+  pausedReason?: string | null;
+  resumeAt?: Date | null;
   createdAt: Date;
 }): Routine {
   return {
@@ -136,6 +138,8 @@ export function mapRoutine(row: {
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
     endsAt: row.endsAt?.toISOString() ?? null,
+    pausedReason: row.pausedReason ?? null,
+    resumeAt: row.resumeAt?.toISOString() ?? null,
     scheduleDelayed: routineScheduleDelayed({
       active: row.active,
       nextRunAt: row.nextRunAt?.getTime() ?? null,

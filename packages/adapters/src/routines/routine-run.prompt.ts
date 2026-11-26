@@ -3,7 +3,7 @@ export function routineRunInstruction(
   alongsideChat: boolean,
   lastRun = false,
 ): string {
-  const scheduled = `This is one scheduled run of your routine${name ? ` "${name}"` : ""}: do the work now, and do not schedule it again. If only the user can unblock you, ask for the specific action you need. Use ask_user if available.`;
+  const scheduled = `This is one scheduled run of your routine${name ? ` "${name}"` : ""}: do the work now, and do not schedule it again. Use routine_state_get and routine_state_set to store cursors, last seen IDs, or checkpoints between runs. If nothing new happened and there is nothing actionable to report, reply with NO_RESPONSE unless this routine specifically asks for a regular briefing or all-clear. If only the user can unblock you, ask for the specific action you need. Use ask_user if available.`;
   const run = lastRun
     ? `${scheduled} It is the last run: the routine reaches its end date and is deleted after it, so say that it has ended when you report.`
     : scheduled;

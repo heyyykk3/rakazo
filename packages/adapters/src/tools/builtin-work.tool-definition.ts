@@ -359,6 +359,16 @@ export const workTools: ConnectorTool[] = [
         routineId: { type: "string" },
         ...scheduleCreateProperties,
         active: { type: "boolean" },
+        pausedReason: {
+          type: "string",
+          maxLength: 240,
+          description: "Optional reason for pausing this routine (used with active: false).",
+        },
+        resumeAt: {
+          type: "string",
+          description:
+            "Optional ISO-8601 timestamp when a paused routine should automatically turn back on.",
+        },
         cron: scheduleTimingSpecs.cron,
         every: scheduleTimingSpecs.every,
         unit: scheduleTimingSpecs.unit,
@@ -390,6 +400,31 @@ export const workTools: ConnectorTool[] = [
         name: { type: "string" },
         ...otherBotRoutineProperties,
       },
+    },
+  },
+  {
+    name: "routine_state_get",
+    description:
+      "Read this routine's persistent JSON state saved by earlier runs (such as cursors, last seen IDs, or checkpoints).",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "routine_state_set",
+    description:
+      "Save persistent JSON state for this routine so later runs remember cursors, seen IDs, or what was already reported. Merges keys by default; pass replace: true to overwrite.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        state: {
+          type: "object",
+          description: "JSON object of key-value state to store (max 32 KB serialized).",
+        },
+        replace: {
+          type: "boolean",
+          description: "Overwrite the entire saved state instead of merging keys.",
+        },
+      },
+      required: ["state"],
     },
   },
   {

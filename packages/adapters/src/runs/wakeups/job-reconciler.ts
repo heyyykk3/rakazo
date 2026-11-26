@@ -1,7 +1,11 @@
 import { setImmediate } from "node:timers/promises";
 import type { JobPublisher, NotificationProvider } from "@rakazo/adapter-kit";
 import { routineWakeupJob, runContinueJob } from "@rakazo/adapter-kit";
-import { BACKGROUND_HELPER_TRIGGER, stuckWorkStatusMessages } from "@rakazo/core";
+import {
+  BACKGROUND_HELPER_TRIGGER,
+  nextRoutineRunDateAcross,
+  stuckWorkStatusMessages,
+} from "@rakazo/core";
 import type { DatabaseOutage, Pool, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { databaseOutage, reconcileComputerRuns, storedMessageBlocks } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -9,6 +13,7 @@ import type { PoolClient } from "pg";
 import { reconcileCallRequests } from "../../calls/call-request.js";
 import { scheduleComputerControlExpiry } from "../../computers/screens/computer-control.js";
 import { returnBotMessageOutcome } from "../../messaging/bot-messages.js";
+import { firstWatchCheck, parseRoutineWatch } from "../../routines/routine-watch.js";
 import { returnHelperOutcome } from "../../tasks/background-helpers.js";
 import { messageBlocksText } from "../assembly/run-replies.prompt.js";
 import { findRunRecoveryBlockers } from "../lifecycle/run-recovery.js";
@@ -518,6 +523,7 @@ export function createJobReconciler(
         controlsDone ||= !controlCursor;
         if (routinesDone && controlsDone) break;
       }
+      await resumeDuePausedRoutines(deps, now);
     })()
       .then(() => {
         lastCompletedAt = Date.now();
@@ -554,6 +560,61 @@ export function createJobReconciler(
       await deps.leadership?.release();
     },
   };
+}
+
+/** Auto-resumes paused routines whose `resumeAt` has passed and schedules their next wakeup. */
+async function resumeDuePausedRoutines(
+  deps: Pick<JobReconcilerDeps, "prisma" | "jobs">,
+  now: Date,
+): Promise<void> {
+  if (
+    typeof deps.prisma.routine?.findMany !== "function" ||
+    typeof deps.prisma.routine?.updateMany !== "function"
+  ) {
+    return;
+  }
+  const duePaused = await deps.prisma.routine.findMany({
+    where: {
+      AND: [
+        {
+          active: false,
+          resumeAt: { lte: now },
+          bot: { archivedAt: null },
+        },
+      ],
+    },
+    take: 50,
+    select: {
+      id: true,
+      crons: true,
+      timezone: true,
+      watch: true,
+      endsAt: true,
+    },
+  });
+  for (const routine of duePaused) {
+    if (!Array.isArray(routine.crons)) continue;
+    if (routine.endsAt && routine.endsAt <= now) {
+      await deps.prisma.routine.updateMany({
+        where: { id: routine.id, active: false },
+        data: { resumeAt: null },
+      });
+      continue;
+    }
+    const watch = parseRoutineWatch(routine.watch);
+    const nextRunAt = watch
+      ? firstWatchCheck(watch, now)
+      : routine.crons.length > 0
+        ? nextRoutineRunDateAcross(routine.crons, now, routine.timezone)
+        : null;
+    const { count } = await deps.prisma.routine.updateMany({
+      where: { id: routine.id, active: false, resumeAt: { lte: now } },
+      data: { active: true, pausedReason: null, resumeAt: null, nextRunAt },
+    });
+    if (count > 0 && nextRunAt) {
+      await deps.jobs.enqueue(routineWakeupJob(routine.id, nextRunAt));
+    }
+  }
 }
 
 /** Settles every publication before failing, so a retried page never overlaps one in flight. */

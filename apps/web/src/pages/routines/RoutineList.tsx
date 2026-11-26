@@ -19,7 +19,15 @@ export function routineTriggerSummary(
   labels: CronLabels = ENGLISH_CRON_LABELS,
   locale = "en",
 ): string {
-  if (!routine.active) return t`Paused`;
+  if (!routine.active) {
+    const parts: string[] = [t`Paused`];
+    if (routine.resumeAt) {
+      const resume = formatRoutineEnd(routine.resumeAt, routine.timezone, locale);
+      parts.push(t`until ${resume}`);
+    }
+    const base = parts.join(" ");
+    return routine.pausedReason ? `${base}: ${routine.pausedReason}` : base;
+  }
   // Schedules first: they say when it runs, so they matter most when the line is cut off.
   const parts: string[] = routine.crons.map((cron) => formatCron(cron, labels));
   if (routine.watch) parts.push(t`When something changes`);
