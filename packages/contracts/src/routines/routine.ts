@@ -74,8 +74,8 @@ export const RoutineSchema = z.object({
   lastRunAt: z.string().nullable(),
   nextRunAt: z.string().nullable(),
   endsAt: z.string().nullable().default(null),
-  pausedReason: z.string().nullable().default(null),
-  resumeAt: z.string().nullable().default(null),
+  pausedReason: z.string().nullable().optional(),
+  resumeAt: z.string().nullable().optional(),
   /** Computed by the server; absent on older servers. Not a worker-health diagnosis. */
   scheduleDelayed: z.boolean().optional(),
   createdAt: z.string(),

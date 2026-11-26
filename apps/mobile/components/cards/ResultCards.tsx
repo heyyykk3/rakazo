@@ -48,8 +48,8 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
       {block.title ? (
         <Text
           style={{
-            fontSize: typeScale.bodySm.size,
-            lineHeight: typeScale.bodySm.lineHeight,
+            fontSize: typeScale.secondary.fontSize,
+            lineHeight: typeScale.secondary.lineHeight,
             fontWeight: fontWeight.medium,
             color: tokens.mutedForeground,
           }}
@@ -92,7 +92,7 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
                 <Text
                   numberOfLines={2}
                   style={{
-                    fontSize: typeScale.body.size,
+                    fontSize: typeScale.body.fontSize,
                     lineHeight: typeScale.body.lineHeight,
                     fontWeight: fontWeight.semibold,
                     color: tokens.foreground,
@@ -104,8 +104,8 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
                   <Text
                     numberOfLines={2}
                     style={{
-                      fontSize: typeScale.bodySm.size,
-                      lineHeight: typeScale.bodySm.lineHeight,
+                      fontSize: typeScale.secondary.fontSize,
+                      lineHeight: typeScale.secondary.lineHeight,
                       color: tokens.mutedForeground,
                     }}
                   >
@@ -117,7 +117,7 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
                     {item.price ? (
                       <Text
                         style={{
-                          fontSize: typeScale.bodySm.size,
+                          fontSize: typeScale.secondary.fontSize,
                           fontWeight: fontWeight.semibold,
                           color: tokens.foreground,
                         }}
@@ -128,7 +128,7 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
                     {item.rating ? (
                       <Text
                         style={{
-                          fontSize: typeScale.bodySm.size,
+                          fontSize: typeScale.secondary.fontSize,
                           color: tokens.mutedForeground,
                         }}
                       >
@@ -141,7 +141,7 @@ export function ResultCards({ block }: { block: ResultCardsBlock }) {
                   <Text
                     numberOfLines={1}
                     style={{
-                      fontSize: typeScale.caption.size,
+                      fontSize: typeScale.caption.fontSize,
                       color: tokens.mutedForeground,
                     }}
                   >

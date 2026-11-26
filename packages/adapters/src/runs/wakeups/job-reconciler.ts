@@ -564,7 +564,7 @@ export function createJobReconciler(
 
 /** Auto-resumes paused routines whose `resumeAt` has passed and schedules their next wakeup. */
 async function resumeDuePausedRoutines(
-  deps: Pick<JobReconcilerDeps, "prisma" | "jobs">,
+  deps: { prisma: PrismaClient; jobs: JobPublisher },
   now: Date,
 ): Promise<void> {
   if (
@@ -603,9 +603,9 @@ async function resumeDuePausedRoutines(
     }
     const watch = parseRoutineWatch(routine.watch);
     const nextRunAt = watch
-      ? firstWatchCheck(watch, now)
+      ? firstWatchCheck()
       : routine.crons.length > 0
-        ? nextRoutineRunDateAcross(routine.crons, now, routine.timezone)
+        ? nextRoutineRunDateAcross(routine.crons, now, now, routine.timezone)
         : null;
     const { count } = await deps.prisma.routine.updateMany({
       where: { id: routine.id, active: false, resumeAt: { lte: now } },

@@ -105,7 +105,7 @@ export function GlobalRoutinesPage() {
     });
   }, [routines, botFilter, statusFilter]);
 
-  const labels = cronLabels();
+  const labels = cronLabels(i18n.locale);
   const actionError = toggleActive.error ?? runNow.error;
 
   return (

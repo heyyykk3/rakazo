@@ -469,11 +469,14 @@ function pushMessageHits(
     }
     const structuredText =
       block.kind === "page"
-        ? [block.title, block.summary].filter(Boolean).join(": ")
+        ? block.title
         : block.kind === "card"
-          ? [block.title, block.body].filter(Boolean).join(": ")
+          ? block.lines.map((line) => `${line.k}: ${line.v}`).join(" ")
           : block.kind === "result_cards"
-            ? [block.title, ...block.cards.flatMap((c) => [c.title, c.subtitle, c.summary])]
+            ? [
+                block.title,
+                ...block.items.flatMap((item) => [item.title, item.subtitle, item.meta]),
+              ]
                 .filter(Boolean)
                 .join(" ")
             : block.kind === "ask"

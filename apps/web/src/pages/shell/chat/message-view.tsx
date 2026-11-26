@@ -464,7 +464,9 @@ export const MessageView = memo(function MessageView({
                   onOpenPeerMessages({
                     peerBotId,
                     peerBotName: peer,
-                    ...(message.groupId && message.botId ? { botId: message.botId } : {}),
+                    ...("groupId" in artifactTarget && message.botId
+                      ? { botId: message.botId }
+                      : {}),
                   })
                 }
               />

@@ -92,7 +92,7 @@ function makeCall(args: Record<string, unknown>): ToolCall {
     args,
     executionId: "exec-1",
     effectKey: "eff-1",
-    finish: async (result) => result,
+    finish: async (result: unknown) => result,
   } as unknown as ToolCall;
 }
 
