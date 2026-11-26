@@ -32,6 +32,7 @@ import { useSpaceQueries } from "../../../lib/query/query";
 import { errorText } from "../../../lib/query/user-error";
 import { ROUTINE_PREVIEW_COUNT, RoutineList } from "../../routines/RoutineList";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
+import { BotOverviewSection } from "./bot-overview-section";
 import {
   DescriptionGroup,
   ModelRow,
@@ -79,6 +80,7 @@ export function BotSettings({
   onSave,
   onExport,
   onClear,
+  onOpenArtifacts,
   focusModel = 0,
 }: {
   bot: Bot;
@@ -87,6 +89,7 @@ export function BotSettings({
   onClose?: () => void;
   computer?: ReactNode;
   routines?: Omit<ComponentProps<typeof RoutineList>, "preview">;
+  onOpenArtifacts?: () => void;
   focusModel?: number;
   onSave: (patch: {
     name?: string;
@@ -595,6 +598,7 @@ export function BotSettings({
           ) : null}
         </div>
         <div className="space-y-6">
+          <BotOverviewSection bot={bot} onOpenArtifacts={onOpenArtifacts} />
           {computer ? (
             <PanelSection label={<Trans>Computer</Trans>}>{computer}</PanelSection>
           ) : null}

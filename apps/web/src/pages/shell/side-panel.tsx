@@ -157,6 +157,7 @@ export function ShellSidePanel({
               onClose={() => setPanel(null)}
               computer={computerPanel}
               routines={routineList}
+              onOpenArtifacts={() => navigate(`/app/artifacts?bot=${active.id}`)}
               focusModel={modelFocusRequest}
               onSave={async ({ computerMode, ...patch }) => {
                 if (computerMode !== undefined && computerMode !== active.computerMode) {

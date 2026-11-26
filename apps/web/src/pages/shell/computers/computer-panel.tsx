@@ -29,6 +29,9 @@ type ComputerPanelProps = {
   onRecoveryDismissed: () => void;
   onOpenComputerSettings?: () => void;
   onOpen: () => void;
+  hasControl?: boolean;
+  onTakeControl?: () => void;
+  onReleaseControl?: () => void;
   cleaningUpDisk?: boolean;
   onCleanUpDisk?: () => void;
   onDismissDiskWarning?: () => void;
@@ -90,6 +93,9 @@ function ComputerPreview({
   onRecoveryDismissed,
   onOpenComputerSettings,
   onOpen,
+  hasControl = false,
+  onTakeControl,
+  onReleaseControl,
 }: Omit<ComputerPanelProps, "cleaningUpDisk" | "onCleanUpDisk" | "onDismissDiskWarning">) {
   // A clickable preview invites a boot that costs money, so an idle computer only wakes from its button.
   const idle =
@@ -201,6 +207,26 @@ function ComputerPreview({
           </button>
         ) : null}
       </div>
+      {computer?.state === "running" &&
+      !computerOpen &&
+      !runsOnUserMachine(computer) &&
+      !computerScreenError &&
+      (onTakeControl || onReleaseControl) ? (
+        <div data-testid="computer-inline-controls" className="mt-2 flex items-center gap-2">
+          {hasControl && onReleaseControl ? (
+            <Button type="button" variant="outline" size="sm" onClick={onReleaseControl}>
+              <Trans>Release control</Trans>
+            </Button>
+          ) : onTakeControl ? (
+            <Button type="button" variant="outline" size="sm" onClick={onTakeControl}>
+              <Trans>Take control</Trans>
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" onClick={onOpen}>
+            <Trans>Full screen</Trans>
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

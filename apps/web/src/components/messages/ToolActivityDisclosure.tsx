@@ -1,4 +1,4 @@
-import { Plural, Trans } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
 import { formatCompactDuration } from "@rakazo/core";
@@ -9,10 +9,12 @@ import {
 } from "@rakazo/ui-web/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { toolStepCount } from "../../lib/chat/tool-activity-view";
 
 type ToolStep = Extract<ThreadMessage["blocks"][number], { kind: "steps" }>["steps"][number];
+
+const EXPANDABLE_STEP_LABEL_LENGTH = 48;
 
 /** While a run is live, only the most recent steps are listed so a long run does not push the chat down. */
 export const LIVE_TOOL_STEP_WINDOW = 6;
@@ -27,8 +29,18 @@ export function ToolSteps({
   /** Show only the last `limit` steps, with a count of the earlier ones above them. */
   limit?: number;
 }) {
+  const { t } = useLingui();
+  const [expandedSteps, setExpandedSteps] = useState<ReadonlySet<number>>(() => new Set());
   const hidden = limit !== undefined && steps.length > limit ? steps.length - limit : 0;
   const shown = hidden > 0 ? steps.slice(hidden) : steps;
+  function toggleStep(index: number) {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
   return (
     <div className="space-y-0.5" data-testid="tool-rows">
       {hidden > 0 ? (
@@ -39,6 +51,20 @@ export function ToolSteps({
       {shown.map((step, offset) => {
         const index = hidden + offset;
         const isCurrent = index === currentIndex;
+        const hasOutcomes = Boolean(
+          step.outcomes &&
+            (step.outcomes.succeeded || step.outcomes.failed || step.outcomes.stopped),
+        );
+        const expandable =
+          step.label.length > EXPANDABLE_STEP_LABEL_LENGTH || step.count > 1 || hasOutcomes;
+        const expanded = expandable && expandedSteps.has(index);
+        const outcomeParts = step.outcomes
+          ? [
+              step.outcomes.succeeded ? t`${step.outcomes.succeeded} succeeded` : null,
+              step.outcomes.failed ? t`${step.outcomes.failed} failed` : null,
+              step.outcomes.stopped ? t`${step.outcomes.stopped} stopped` : null,
+            ].filter(Boolean)
+          : [];
         return (
           <Fragment key={index}>
             {step.note ? (
@@ -46,25 +72,66 @@ export function ToolSteps({
                 <ChatMarkdown>{step.note}</ChatMarkdown>
               </div>
             ) : null}
-            <div className="flex min-w-0 items-center gap-2 leading-5">
-              <span
-                className={`text-label ${
-                  isCurrent
-                    ? "text-warning motion-safe:animate-[rkPulse_1.2s_ease-in-out_infinite]"
-                    : "text-success"
-                }`}
-              >
-                {isCurrent ? "◷" : "✓"}
-              </span>
-              <span
-                className={`min-w-0 flex-1 truncate text-body-sm ${
-                  isCurrent ? "text-foreground" : "text-muted-foreground"
-                }`}
-                title={step.label}
-              >
-                {step.label}
-                {step.count > 1 ? ` ×${step.count}` : ""}
-              </span>
+            <div className="min-w-0">
+              {expandable ? (
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => toggleStep(index)}
+                  className="flex w-full min-w-0 items-start gap-2 rounded-sm text-start leading-5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span
+                    className={`shrink-0 text-label ${
+                      isCurrent
+                        ? "text-warning motion-safe:animate-[rkPulse_1.2s_ease-in-out_infinite]"
+                        : "text-success"
+                    }`}
+                  >
+                    {isCurrent ? "◷" : "✓"}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 text-body-sm ${
+                      expanded ? "whitespace-pre-wrap break-words" : "truncate"
+                    } ${isCurrent ? "text-foreground" : "text-muted-foreground"}`}
+                    title={step.label}
+                  >
+                    {step.label}
+                    {step.count > 1 ? ` ×${step.count}` : ""}
+                  </span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    size={12}
+                    strokeWidth={1.8}
+                    className={`mt-1 shrink-0 text-muted-foreground/70 transition-transform ${expanded ? "rotate-90" : ""}`}
+                  />
+                </button>
+              ) : (
+                <div className="flex min-w-0 items-center gap-2 leading-5">
+                  <span
+                    className={`text-label ${
+                      isCurrent
+                        ? "text-warning motion-safe:animate-[rkPulse_1.2s_ease-in-out_infinite]"
+                        : "text-success"
+                    }`}
+                  >
+                    {isCurrent ? "◷" : "✓"}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 truncate text-body-sm ${
+                      isCurrent ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                    title={step.label}
+                  >
+                    {step.label}
+                    {step.count > 1 ? ` ×${step.count}` : ""}
+                  </span>
+                </div>
+              )}
+              {expanded && outcomeParts.length > 0 ? (
+                <div className="ps-5 pt-0.5 text-caption text-muted-foreground">
+                  {outcomeParts.join(", ")}
+                </div>
+              ) : null}
             </div>
           </Fragment>
         );

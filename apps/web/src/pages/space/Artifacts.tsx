@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { IconTooltip } from "../../components/IconTooltip";
 import { VideoPreview } from "../../components/messages/ArtifactFileCard";
@@ -68,6 +68,17 @@ import { useRedrawAtMidnight } from "../shell/chat/use-redraw-at-midnight";
 
 type ViewMode = "grid" | "list";
 type DateFilter = "all" | "today" | "week" | "month";
+type KindFilter = "all" | "media" | "documents" | "code";
+
+function matchesKindFilter(mimeType: string, filter: KindFilter): boolean {
+  if (filter === "all") return true;
+  const kind = artifactPreviewKind(mimeType);
+  if (filter === "media")
+    return kind === "image" || kind === "video" || mimeType.startsWith("audio/");
+  if (filter === "documents") return kind === "pdf" || kind === "markdown" || kind === "html";
+  if (filter === "code") return kind === "text";
+  return true;
+}
 const viewModePreference = createStoredPreference<ViewMode>({
   key: "rakazo:artifacts-view-mode",
   parse: (raw) => (raw === "list" ? "list" : "grid"),
@@ -117,13 +128,15 @@ function matchesCalendarDateFilter(
 
 export function ArtifactsPage() {
   const { artifactId } = useParams<{ artifactId?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const today = useRedrawAtMidnight();
   const { t } = useLingui();
-  const [activeBotId, setActiveBotId] = useState<string | null>(null);
+  const [activeBotId, setActiveBotId] = useState<string | null>(() => searchParams.get("bot"));
   const viewMode = viewModePreference.use();
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [madeByBots, setMadeByBots] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ArtifactSummary | null>(null);
@@ -181,6 +194,7 @@ export function ArtifactsPage() {
     const weekStartsOn = dateFilter === "week" ? firstDayOfWeek(locale) : 0;
     const query = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
+      if (!matchesKindFilter(item.mimeType, kindFilter)) return false;
       if (!matchesCalendarDateFilter(item.createdAt, dateFilter, now, weekStartsOn)) return false;
       if (!query) return true;
       return (
@@ -189,14 +203,15 @@ export function ArtifactsPage() {
       );
     });
     // `today` is listed so the midnight tick invalidates cached date filters.
-  }, [items, searchQuery, dateFilter, today, locale]);
+  }, [items, searchQuery, dateFilter, kindFilter, today, locale]);
 
-  const clientFilterActive = searchQuery.trim().length > 0 || dateFilter !== "all";
+  const clientFilterActive =
+    searchQuery.trim().length > 0 || dateFilter !== "all" || kindFilter !== "all";
   const autoFetchedCursorRef = useRef<string | null>(null);
 
   useEffect(() => {
     autoFetchedCursorRef.current = null;
-  }, [searchQuery, dateFilter, activeBotId, madeByBots]);
+  }, [searchQuery, dateFilter, kindFilter, activeBotId, madeByBots]);
 
   // Search and date filters only see loaded pages, so keep paging until something matches.
   useEffect(() => {
@@ -235,6 +250,7 @@ export function ArtifactsPage() {
   function clearFilters() {
     setSearchQuery("");
     setDateFilter("all");
+    setKindFilter("all");
     setActiveBotId(null);
     setMadeByBots(false);
   }
@@ -277,6 +293,18 @@ export function ArtifactsPage() {
             {bots.length > 1 ? (
               <BotFilter bots={bots} value={activeBotId} onValueChange={setActiveBotId} />
             ) : null}
+            <OptionSelect
+              aria-label={t`Filter by type`}
+              className="w-fit"
+              value={kindFilter}
+              onValueChange={setKindFilter}
+              options={[
+                { value: "all", label: t`All types` },
+                { value: "media", label: t`Images and video` },
+                { value: "documents", label: t`Documents` },
+                { value: "code", label: t`Code and text` },
+              ]}
+            />
             <OptionSelect
               aria-label={t`Filter by date`}
               className="w-fit"

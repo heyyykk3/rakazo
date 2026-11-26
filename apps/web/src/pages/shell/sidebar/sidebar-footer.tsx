@@ -21,6 +21,7 @@ import {
   LogOut,
   Plug,
   Plus,
+  Repeat,
   ScrollText,
   Settings,
   Smartphone,
@@ -48,6 +49,7 @@ type Props = {
   links?: NavLink[];
   onLink?: (link: NavLink) => void;
   onArtifacts: () => void;
+  onRoutines?: () => void;
   onSharedPages?: () => void;
   onSettings: () => void;
   /** How much of the member's allowance is used; the Usage row shows only with one. */
@@ -83,6 +85,7 @@ export function SidebarFooter({
   links = [],
   onLink,
   onArtifacts,
+  onRoutines,
   onSharedPages,
   onSettings,
   usage,
@@ -221,6 +224,17 @@ export function SidebarFooter({
               <FolderOpen className="text-muted-foreground" strokeWidth={1.75} />
               <Trans>Artifacts</Trans>
             </Button>
+            {onRoutines ? (
+              <Button
+                variant="ghost"
+                size="lg"
+                className="w-full justify-start gap-2.5 font-normal"
+                onClick={onRoutines}
+              >
+                <Repeat className="text-muted-foreground" strokeWidth={1.75} />
+                <Trans>Routines</Trans>
+              </Button>
+            ) : null}
             {onSharedPages ? (
               <Button
                 variant="ghost"
