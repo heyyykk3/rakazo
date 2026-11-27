@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   currentTurnDataPrompt,
   RAKAZO_PLATFORM_INSTRUCTION,
+  RAKAZO_VOICE_INSTRUCTION,
   userTurnInstructions,
 } from "../../runs/assembly/run-instructions.prompt.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
@@ -350,7 +351,7 @@ describe("Pi outgoing provider prefixes", () => {
         expect(request.messages[0]?.role).toBe("system");
         expect(
           String(request.messages[0]?.content).startsWith(
-            `${RAKAZO_PLATFORM_INSTRUCTION}\n\nStable guidance.\nStable constraints.`,
+            `${RAKAZO_PLATFORM_INSTRUCTION}\n\n${RAKAZO_VOICE_INSTRUCTION}\n\nStable guidance.\nStable constraints.`,
           ),
         ).toBe(true);
       }

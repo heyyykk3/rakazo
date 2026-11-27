@@ -109,7 +109,7 @@ export async function applyTool(
   observer?: AgentToolExecutionObserver,
 ) {
   ctx.state.toolStarted = true;
-  if (name !== "message_user") ctx.state.reply.nonMessagingToolStarted = true;
+  if (name !== "message_user" && ctx.state.reply) ctx.state.reply.nonMessagingToolStarted = true;
   // Refused there: a routine with its owner's computer is never offered update_bot.
   if (ctx.source.ownerComputerRoutine) return dispatchTool(ctx, name, args, executionId, observer);
   // A bot naming itself in bot_id means its own settings. Dropping it here sends the call down

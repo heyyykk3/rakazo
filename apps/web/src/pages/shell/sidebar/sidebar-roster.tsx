@@ -446,7 +446,7 @@ export function SidebarRoster({
                               <span
                                 aria-hidden="true"
                                 data-roster-unread-dot
-                                className="absolute -end-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-semibold leading-none tabular-nums text-white ring-2 ring-sidebar"
+                                className="absolute -end-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-caption font-semibold leading-none tabular-nums text-white ring-2 ring-sidebar"
                               >
                                 {unreadBadgeText}
                               </span>
@@ -523,7 +523,7 @@ export function SidebarRoster({
                                 <span
                                   aria-hidden="true"
                                   data-roster-unread-dot
-                                  className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-semibold leading-none tabular-nums text-white"
+                                  className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-unread px-1 text-caption font-semibold leading-none tabular-nums text-white"
                                 >
                                   {unreadBadgeText}
                                 </span>

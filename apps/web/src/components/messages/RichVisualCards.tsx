@@ -202,7 +202,7 @@ export function PlacesCard({ block }: { block: PlacesBlock }) {
                   className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-semibold transition-transform focus-visible:outline-2 focus-visible:outline-ring ${
                     active
                       ? "z-10 size-6 scale-110 bg-primary text-caption text-primary-foreground shadow-sm"
-                      : "size-5 bg-muted-foreground/80 text-[11px] text-background hover:scale-105"
+                      : "size-5 bg-muted-foreground/80 text-caption text-background hover:scale-105"
                   }`}
                 >
                   {pin.index + 1}

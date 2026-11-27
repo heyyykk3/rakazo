@@ -703,18 +703,21 @@ export function createRuntimeContextPolicy(
   function rebuildWithHeadroom(ctx: Context, model: Model<Api>): Prepared | undefined {
     const window = request.model.contextWindow ?? model.contextWindow;
     const reserve = outputReserve(model);
-    const compactedMessages = compactLongLoopMessages(ctx.messages);
-    const candidate =
-      compactedMessages === ctx.messages ? ctx : { ...ctx, messages: compactedMessages };
+    const targetReserve = reserve + Math.floor((window - reserve) * (1 - REBUILD_HEADROOM));
     try {
-      return rebuild(
-        candidate,
-        model,
-        reserve + Math.floor((window - reserve) * (1 - REBUILD_HEADROOM)),
-      );
+      return rebuild(ctx, model, targetReserve);
     } catch (error) {
-      if (error instanceof ContextBudgetError) return undefined;
-      throw error;
+      if (!(error instanceof ContextBudgetError)) throw error;
+      // Normal in-place compaction could not fit a long tool loop; collapse older exchanges into a
+      // structured progress checkpoint and retry once.
+      const compactedMessages = compactLongLoopMessages(ctx.messages);
+      if (compactedMessages === ctx.messages) return undefined;
+      try {
+        return rebuild({ ...ctx, messages: compactedMessages }, model, targetReserve);
+      } catch (retryError) {
+        if (retryError instanceof ContextBudgetError) return undefined;
+        throw retryError;
+      }
     }
   }
   function firstChange(before: Message[], after: Message[]): number {

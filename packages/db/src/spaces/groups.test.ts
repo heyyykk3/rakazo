@@ -68,6 +68,7 @@ describe("listSpaceGroupsForSpaces", () => {
         ],
         preview: "Escalation pending",
         unread: true,
+        unreadCount: 0,
         snoozedUntil: "2026-08-21T09:00:00.000Z",
         updatedAt: "2026-08-20T00:00:00.000Z",
       },

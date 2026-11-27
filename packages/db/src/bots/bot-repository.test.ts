@@ -529,6 +529,7 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
         pinned: true,
         sectionId: null,
         unread: true,
+        unreadCount: 0,
         snoozedUntil: "2026-08-21T09:00:00.000Z",
         parentBotId: null,
         preview: "Waiting for a reply",
