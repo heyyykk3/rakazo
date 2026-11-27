@@ -291,6 +291,21 @@ describe("Pi runtime transient model retries", () => {
     expect(providerState.stream).toHaveBeenCalledTimes(attempts);
   });
 
+  it("does not regenerate a malformed function call after the same-model time limit expires", async () => {
+    vi.useFakeTimers();
+    const details = "Provider stopped with: MALFORMED_FUNCTION_CALL";
+    const failure = {
+      ...message(primary, [], "error", details),
+      rawStopReason: "MALFORMED_FUNCTION_CALL",
+    };
+    providerState.stream.mockImplementation(() => {
+      vi.advanceTimersByTime(10 * 60_000);
+      return stream(primary, failure);
+    });
+    await expect(run(request())).rejects.toThrow(details);
+    expect(providerState.stream).toHaveBeenCalledTimes(1);
+  });
+
   it("recovers one empty idle stream after the header retry budget expires", async () => {
     vi.useFakeTimers();
     providerState.delay.mockImplementation(async (delay) => {

@@ -485,6 +485,7 @@ export function fallbackAwareModelStream(
     // Set once this call has been repeated after spending its output budget on nothing visible.
     let lengthRecovered = false;
     let regeneratedToolCall = false;
+    let malformedFailure: Extract<AssistantMessageEvent, { type: "error" }> | undefined;
     let emptyRetries = 0;
     let outputBudget = state.nextCallRecovery?.maxTokens;
     let thinkingOverride = state.nextCallRecovery?.thinkingLevel;
@@ -499,14 +500,16 @@ export function fallbackAwareModelStream(
       thinkingOverride = undefined;
       sizingFailure = undefined;
       lengthRecovered = false;
+      regeneratedToolCall = false;
+      malformedFailure = undefined;
       emptyRetries = 0;
     };
     const continuingCutReply = Boolean(state.continuingCutReply);
     state.continuingCutReply = false;
     while (!signalAborted()) {
       const remainingMs = timeoutMs - (Date.now() - startedAt);
-      const failure = firstRetryableError ?? sizingFailure;
-      if ((retries > 0 || sizingFailure) && remainingMs <= 0 && failure) {
+      const failure = firstRetryableError ?? sizingFailure ?? malformedFailure;
+      if ((retries > 0 || sizingFailure || regeneratedToolCall) && remainingMs <= 0 && failure) {
         output.push(failure);
         output.end(failure.error);
         return;
@@ -521,7 +524,7 @@ export function fallbackAwareModelStream(
       const outputCap = state.outputCaps?.get(targetKey);
       const attemptOptions = {
         ...options,
-        ...(retries > 0 || sizingFailure ? { timeoutMs: remainingMs } : {}),
+        ...(retries > 0 || sizingFailure || regeneratedToolCall ? { timeoutMs: remainingMs } : {}),
         ...(outputCap !== undefined
           ? { maxTokens: Math.min(outputCap, options?.maxTokens ?? outputCap) }
           : {}),
@@ -612,11 +615,13 @@ export function fallbackAwareModelStream(
               if (
                 event.error.rawStopReason === "MALFORMED_FUNCTION_CALL" &&
                 !regeneratedToolCall &&
-                state.selfRecoveries < MAX_SELF_RECOVERIES_PER_RUN
+                state.selfRecoveries < MAX_SELF_RECOVERIES_PER_RUN &&
+                timeoutMs - (Date.now() - startedAt) > 0
               ) {
                 // The provider rejected its own output. Regenerate only this model step;
                 // the context already contains the results of all previously executed tools.
                 regeneratedToolCall = true;
+                malformedFailure = event;
                 state.selfRecoveries += 1;
                 getLogger().info("model.malformed_tool_call.retry", {
                   runId: state.request.runId,
