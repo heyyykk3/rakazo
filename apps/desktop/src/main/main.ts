@@ -62,6 +62,7 @@ import {
 } from "./setup/setup-window.js";
 import { createBadgeHandler } from "./system/badge.js";
 import { createClipboardHandler } from "./system/clipboard.js";
+import { startDesktopLocalProxy } from "./system/local-proxy.js";
 import {
   configureDesktopMonitoring,
   desktopReportsErrors,
@@ -868,6 +869,7 @@ app.whenReady().then(async () => {
     createLocaleHandler((locale) => writeUiLocale(userDataDir, locale), installApplicationMenu),
   );
   const trayQuickAsk = startDesktopTrayQuickAsk(() => showSetupWindow());
+  await startDesktopLocalProxy(userDataDir);
   handleIpc("desktop.badge.set", createBadgeHandler(trayQuickAsk.setBadgeCount));
   if (process.platform === "darwin") {
     // Installed builds ship the helper as an extra resource; `pnpm build` compiles it for development.

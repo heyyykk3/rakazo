@@ -12,7 +12,7 @@ import {
   mapTurnTranscript,
   turnTranscriptResults,
 } from "../../runtime/pi/pi-runtime-transcript.js";
-import { storeStepScreenshot } from "../../storage/thread-artifacts.js";
+import { storeStepPreviewScreenshot, storeStepScreenshot } from "../../storage/thread-artifacts.js";
 import type { ReplyState, RunContext } from "../assembly/run-context.js";
 import { toolCompletionOutcome } from "./tool-completion-audit.js";
 
@@ -172,11 +172,18 @@ export function keptTurnTranscript(transcript: string, secrets: string[]): strin
   );
 }
 
+/** At most this many step preview screenshots are kept per reply to bound memory and storage. */
+const MAX_STEP_PREVIEW_SCREENSHOTS = 6;
+
 /** Adds a finished call's result to the call its step keeps, within the reply's result budget. */
 export function keepToolStepResult(
   reply: Pick<
     ReplyState,
-    "toolStepCalls" | "keptResultChars" | "latestScreenshot" | "earlyCompletions"
+    | "toolStepCalls"
+    | "keptResultChars"
+    | "latestScreenshot"
+    | "stepPreviewScreenshots"
+    | "earlyCompletions"
   >,
   completion: AgentToolCompletion,
   secrets: string[],
@@ -198,7 +205,18 @@ export function keepToolStepResult(
       : undefined;
   if (result !== undefined) reply.keptResultChars += result.length;
   const image = screenshotOf(completion);
-  if (image) reply.latestScreenshot = { executionId: completion.executionId, ...image };
+  if (image) {
+    reply.latestScreenshot = { executionId: completion.executionId, ...image };
+    reply.stepPreviewScreenshots ??= new Map();
+    if (
+      !reply.stepPreviewScreenshots.has(completion.executionId) &&
+      reply.stepPreviewScreenshots.size >= MAX_STEP_PREVIEW_SCREENSHOTS
+    ) {
+      const oldest = reply.stepPreviewScreenshots.keys().next().value;
+      if (oldest !== undefined) reply.stepPreviewScreenshots.delete(oldest);
+    }
+    reply.stepPreviewScreenshots.set(completion.executionId, image);
+  }
   reply.toolStepCalls.set(completion.executionId, {
     ...call,
     ...(result === undefined ? {} : { result }),
@@ -292,5 +310,36 @@ export async function saveLatestStepScreenshot(ctx: RunContext): Promise<void> {
     reply.toolStepCalls.set(shot.executionId, { ...call, image: { artifactId } });
   } catch (error) {
     getLogger().error("step screenshot save", error);
+  }
+}
+
+/**
+ * Saves bounded per-step preview screenshots as hidden preview artifacts so expandable tool rows
+ * in chat can show what the bot saw on each step. Failures leave the step text intact.
+ */
+export async function saveStepPreviewScreenshots(ctx: RunContext): Promise<void> {
+  const { reply } = ctx.state;
+  const previews = reply.stepPreviewScreenshots;
+  reply.stepPreviewScreenshots = undefined;
+  if (!previews?.size || !ctx.deps.artifacts) return;
+  reply.stepPreviewArtifactIds ??= new Map();
+  for (const [executionId, image] of previews) {
+    try {
+      const artifactId = await storeStepPreviewScreenshot(
+        { prisma: ctx.deps.prisma, artifacts: ctx.deps.artifacts },
+        {
+          spaceId: ctx.run.spaceId,
+          userId: ctx.run.userId,
+          botId: ctx.bot.id,
+          groupId: ctx.thread.groupId ?? undefined,
+          runId: ctx.runId,
+          operationId: `${ctx.runId}:${executionId}:step-preview`,
+          image,
+        },
+      );
+      reply.stepPreviewArtifactIds.set(executionId, artifactId);
+    } catch (error) {
+      getLogger().error("step preview screenshot save", error);
+    }
   }
 }

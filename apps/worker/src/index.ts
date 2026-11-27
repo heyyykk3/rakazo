@@ -24,6 +24,7 @@ import {
   createLifecycleEmailSender,
   createMediaGenerationProvider,
   createMeetingServices,
+  createOutboundCallProvider,
   createPaymentWalletProvider,
   createPostgresReconciliationLeadership,
   createPushDelivery,
@@ -177,6 +178,7 @@ async function main() {
   const cloudAgent = createCloudAgentConnection();
   const paymentWallet = await createPaymentWalletProvider();
   const mediaGeneration = createMediaGenerationProvider();
+  const outboundCalls = createOutboundCallProvider();
   // Shared with the reconciler so a stuck wait uses the same push path as a finish notice.
   const { notifications, workActivities } = await createPushDelivery({
     prisma,
@@ -260,6 +262,7 @@ async function main() {
       },
     ),
     paymentWallet,
+    outboundCalls,
     stoppingSignal: shutdown.signal,
     shutdownSignal: runDrain.signal,
   });

@@ -35,8 +35,9 @@ function acquireDownload(target: ArtifactTarget, artifactId: string) {
         .get({ ...target, artifactId })
         .then((artifact) => {
           const bytes = decodeArtifactBase64(artifact.contentBase64);
+          const baseType = artifact.mimeType.split(";")[0]?.trim() || artifact.mimeType;
           entry.objectUrl = URL.createObjectURL(
-            new Blob([new Uint8Array(bytes)], { type: artifact.mimeType }),
+            new Blob([new Uint8Array(bytes)], { type: baseType }),
           );
           return entry.objectUrl;
         })

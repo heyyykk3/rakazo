@@ -403,7 +403,11 @@ export const MessageView = memo(function MessageView({
         <>
           {messageContext}
           <div className="relative">
-            <ToolOnlyNarration blocks={visibleNarrationBlocks} live={isLive} />
+            <ToolOnlyNarration
+              blocks={visibleNarrationBlocks}
+              live={isLive}
+              artifactTarget={artifactTarget}
+            />
             {hoverActions}
           </div>
         </>
@@ -432,6 +436,7 @@ export const MessageView = memo(function MessageView({
                         steps={block.steps}
                         currentIndex={isLive ? block.steps.length - 1 : undefined}
                         limit={isLive ? LIVE_TOOL_STEP_WINDOW : undefined}
+                        artifactTarget={artifactTarget}
                       />
                     </ToolActivityDisclosure>
                   );

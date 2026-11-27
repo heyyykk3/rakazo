@@ -115,6 +115,7 @@ const BACKGROUND_DROPPED_TOOL_NAMES: ReadonlySet<string> = new Set([
   "message_bot",
   "handoff_to_bot",
   "message_agent",
+  "place_call",
   "generate_image",
   "generate_video",
 ]);
@@ -131,6 +132,7 @@ export const SUBAGENT_HIDDEN_TOOLS: ReadonlySet<string> = new Set([
   "show_places",
   "show_html",
   "call_user",
+  "place_call",
   "end_call",
   "request_takeover",
   "update_bot",
@@ -156,6 +158,8 @@ export function offersAgentConnectionTools(options: {
 export function selectBuiltinToolsForRun(options: {
   ticketBoardEnabled?: boolean;
   phoneCallsEnabled?: boolean;
+  /** Outbound PSTN phone calls are configured on this deployment. */
+  outboundCallsEnabled?: boolean;
   historyRetrievalEnabled?: boolean;
   /** See historyMyChatsAllowed; otherwise search_history offers only this chat. */
   historyMyChats?: boolean;
@@ -276,6 +280,10 @@ export function selectBuiltinToolsForRun(options: {
         !options.messagingChannelRun &&
         !isBackgroundRunTrigger(options.trigger)) ||
         tool.name !== "call_user") &&
+      ((options.outboundCallsEnabled &&
+        !options.messagingChannelRun &&
+        !isBackgroundRunTrigger(options.trigger)) ||
+        tool.name !== "place_call") &&
       (options.historyRetrievalEnabled ||
         !["search_history", "read_history"].includes(tool.name)) &&
       (!options.ownPromptOnly || OWN_PROMPT_ONLY_TOOLS.has(tool.name)) &&

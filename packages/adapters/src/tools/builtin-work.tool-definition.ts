@@ -496,4 +496,23 @@ export const workTools: ConnectorTool[] = [
       required: ["reason", "opening"],
     },
   },
+  {
+    name: "place_call",
+    description:
+      "Place an outbound voice phone call to a real phone number and speak a short message when answered. Use only when the user asked you to call a phone number.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        to: {
+          type: "string",
+          description: 'Destination phone number in E.164 format, e.g. "+14155550100".',
+        },
+        message: {
+          type: "string",
+          description: "Short spoken message delivered when the call is answered (max 1500 chars).",
+        },
+      },
+      required: ["to", "message"],
+    },
+  },
 ];

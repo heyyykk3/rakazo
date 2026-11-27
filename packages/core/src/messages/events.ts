@@ -429,6 +429,8 @@ export function withToolStepOutcomes(
     /** The tool the call ran, and what it kept, when the call shows as its own step. */
     tool?: string;
     call?: ToolStepCall;
+    /** Optional per-step preview screenshot artifact shown when the user expands the step. */
+    screenshotArtifactId?: string;
   }[],
 ): MessageBlock[] {
   let next = 0;
@@ -451,6 +453,9 @@ export function withToolStepOutcomes(
       // Calls are kept for a step only when every one of them was, all of the same tool.
       const tool = own[0]?.tool;
       const kept = own.flatMap((call) => (call.call ? [call.call] : []));
+      const screenshotArtifactId = own.findLast(
+        (call) => call.screenshotArtifactId,
+      )?.screenshotArtifactId;
       const replayable =
         tool !== undefined &&
         next <= TOOL_STEP_CALLS_KEPT &&
@@ -458,6 +463,7 @@ export function withToolStepOutcomes(
         own.every((call) => call.tool === tool);
       steps.push({
         ...rest,
+        ...(screenshotArtifactId ? { screenshotArtifactId } : {}),
         ...(replayable ? { tool, calls: kept } : {}),
         ...(Object.keys(outcomes).length > 0 ? { outcomes } : {}),
       });

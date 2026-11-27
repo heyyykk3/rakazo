@@ -350,6 +350,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
         count: z.number().int().positive(),
         /** What the bot wrote just before this step, kept out of its reply. */
         note: z.string().optional(),
+        /** Hidden step-preview screenshot artifact shown when a user expands this step row. */
+        screenshotArtifactId: Id.optional(),
         /** How many of this step's calls succeeded, failed, or were stopped before finishing. */
         outcomes: z
           .object({

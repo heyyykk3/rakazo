@@ -107,6 +107,7 @@ export const BUILTIN_TOOL_NAMES = [
   "routine_state_set",
   "end_call",
   "call_user",
+  "place_call",
   "skill_read",
   "skill_create",
   "skill_update",

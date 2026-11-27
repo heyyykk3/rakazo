@@ -43,7 +43,11 @@ import {
   stripNoResponseReply,
   stripStrayNoResponse,
 } from "../assembly/silent-reply.js";
-import { keptTurnTranscript, saveLatestStepScreenshot } from "../turn/tool-step-calls.js";
+import {
+  keptTurnTranscript,
+  saveLatestStepScreenshot,
+  saveStepPreviewScreenshots,
+} from "../turn/tool-step-calls.js";
 import { enqueueSteeringContinuation, renewRunLease } from "./run-lifecycle.js";
 import {
   completionMarksUnread,
@@ -295,6 +299,7 @@ async function finalReply(ctx: RunContext) {
   }
   flushPendingTools(reply);
   await saveLatestStepScreenshot(ctx);
+  await saveStepPreviewScreenshots(ctx);
   reply.messageSegments = withReplyToolOutcomes(reply);
   // Silent-allowed runs can choose an explicit NO_RESPONSE or finish empty.
   // Other runs still drop a stray sentinel at the edges of a real reply.

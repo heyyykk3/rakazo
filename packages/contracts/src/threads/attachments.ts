@@ -20,6 +20,7 @@ export const ATTACHMENT_IMAGE_MIME_TYPES = [
 
 export type AttachmentImageMimeType = (typeof ATTACHMENT_IMAGE_MIME_TYPES)[number];
 const STEP_SCREENSHOT_PROFILE = ";profile=step-screenshot";
+const STEP_PREVIEW_PROFILE = ";profile=step-preview";
 /**
  * A screenshot a reply kept so its later turns can see it again. Stored and read like an image
  * attachment, but this type keeps it out of every file list, search and version history.
@@ -27,17 +28,32 @@ const STEP_SCREENSHOT_PROFILE = ";profile=step-screenshot";
 export const STEP_SCREENSHOT_MIME_TYPES = ATTACHMENT_IMAGE_MIME_TYPES.map(
   (type) => `${type}${STEP_SCREENSHOT_PROFILE}`,
 );
+/**
+ * A per-step screenshot thumbnail attached to a tool step row in chat. Stored as a hidden
+ * artifact (never listed, searched, or versioned) and loaded on demand when the user expands a step.
+ */
+export const STEP_PREVIEW_MIME_TYPES = ATTACHMENT_IMAGE_MIME_TYPES.map(
+  (type) => `${type}${STEP_PREVIEW_PROFILE}`,
+);
 export function stepScreenshotMimeType(imageType: AttachmentImageMimeType): string {
   return `${imageType}${STEP_SCREENSHOT_PROFILE}`;
 }
+export function stepPreviewMimeType(imageType: AttachmentImageMimeType): string {
+  return `${imageType}${STEP_PREVIEW_PROFILE}`;
+}
 export function isStepScreenshotMimeType(mimeType: string): boolean {
   return mimeType.endsWith(STEP_SCREENSHOT_PROFILE);
+}
+export function isStepPreviewMimeType(mimeType: string): boolean {
+  return mimeType.endsWith(STEP_PREVIEW_PROFILE);
 }
 /** The image type a kept screenshot, or an image attachment, shows as; else undefined. */
 export function storedImageMimeType(mimeType: string): AttachmentImageMimeType | undefined {
   const type = mimeType.endsWith(STEP_SCREENSHOT_PROFILE)
     ? mimeType.slice(0, -STEP_SCREENSHOT_PROFILE.length)
-    : mimeType;
+    : mimeType.endsWith(STEP_PREVIEW_PROFILE)
+      ? mimeType.slice(0, -STEP_PREVIEW_PROFILE.length)
+      : mimeType;
   return (ATTACHMENT_IMAGE_MIME_TYPES as readonly string[]).includes(type)
     ? (type as AttachmentImageMimeType)
     : undefined;

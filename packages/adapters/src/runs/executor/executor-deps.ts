@@ -11,6 +11,7 @@ import type {
   MediaGenerationProvider,
   MemoryStore,
   NotificationProvider,
+  OutboundCallProvider,
   PaidServiceProvider,
   PaymentWalletProvider,
   SandboxProvider,
@@ -64,6 +65,8 @@ export interface ExecutorDeps {
   /** Labs features this deployment turns on for every account. */
   deploymentLabs?: readonly LabFeature[];
   phoneCallsEnabled?: boolean;
+  /** Provider-neutral outbound PSTN phone call service; absent keeps `place_call` off. */
+  outboundCalls?: OutboundCallProvider;
   /** The domain bot email addresses are on; absent when this server receives no email. */
   inboundEmailDomain?: string;
   /** Sends a bot's email from its own address; absent when this server sends no email. */

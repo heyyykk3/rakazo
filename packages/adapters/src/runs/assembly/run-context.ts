@@ -155,6 +155,10 @@ export interface ReplyState {
   earlyCompletions?: Map<string, AgentToolCompletion>;
   /** The last screenshot a kept call returned, saved with the reply for its later turns. */
   latestScreenshot?: { executionId: string; mimeType: AttachmentImageMimeType; data: Uint8Array };
+  /** Bounded per-step screenshots captured during this turn for expandable step rows in chat. */
+  stepPreviewScreenshots?: Map<string, { mimeType: AttachmentImageMimeType; data: Uint8Array }>;
+  /** Saved step-preview artifact ids keyed by tool executionId. */
+  stepPreviewArtifactIds?: Map<string, string>;
   pendingProgress: string;
   lastProgressAt: number;
   hasStreamedText: boolean;

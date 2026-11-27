@@ -33,6 +33,7 @@ export {
   createApnsVoipProvider,
 } from "./calls/apns-voip-config.js";
 export { loadUserIncomingCalls, settleCallRequest } from "./calls/call-request.js";
+export { createOutboundCallProvider } from "./calls/outbound-call-factory.js";
 export * from "./cloud-agents/cloud-agent-emulator.js";
 export * from "./cloud-agents/cloud-agent-factory.js";
 export * from "./cloud-agents/cloud-agent-poll.js";

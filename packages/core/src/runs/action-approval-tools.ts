@@ -94,6 +94,7 @@ export const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "user_computer_act",
   "feedback",
   "send_email",
+  "place_call",
   "create_space",
   "set_child_bot_model",
 ]);
@@ -125,6 +126,7 @@ export const OWN_STATE_RESULT_TOOLS = new Set([
   "list_fleet",
   "list_secrets",
   "message_user",
+  "place_call",
   "react",
   "read_history",
   "recall_memory",

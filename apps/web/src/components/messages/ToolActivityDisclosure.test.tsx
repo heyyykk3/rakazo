@@ -216,6 +216,16 @@ describe("StandaloneToolActivity", () => {
     expect(done).not.toContain("earlier");
     for (let i = 0; i < 9; i++) expect(done).toContain(`step-${i}<`);
   });
+
+  it("makes steps with screenshotArtifactId expandable", () => {
+    const html = renderToStaticMarkup(
+      <ToolSteps
+        steps={[{ label: "Look at computer", count: 1, screenshotArtifactId: "art-shot-1" }]}
+      />,
+    );
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Look at computer");
+  });
 });
 
 describe("ToolOnlyNarration", () => {

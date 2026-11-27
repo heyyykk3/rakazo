@@ -1,6 +1,6 @@
 import type { HistoryToolStep, RunTrigger } from "@rakazo/contracts";
 import { RUN_TRIGGERS } from "@rakazo/contracts";
-import { appendToolCallSegment } from "@rakazo/core";
+import { appendToolCallSegment, withToolStepOutcomes } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import type { ReplyState, RunContext } from "../assembly/run-context.js";
 import { redactBlocks } from "../assembly/run-messages.js";
@@ -13,6 +13,7 @@ import {
   keptToolResult,
   runReplaysToolHistory,
   saveLatestStepScreenshot,
+  saveStepPreviewScreenshots,
   TOOL_CALL_TEXT_MAX_CHARS,
   TOOL_REPLY_RESULTS_MAX_CHARS,
 } from "./tool-step-calls.js";
@@ -391,5 +392,78 @@ describe("tool step outcomes", () => {
     expect(reply.toolStepCalls.get("call-2")).toMatchObject({ image: { artifactId: "shot-1" } });
     expect(reply.toolStepCalls.get("call-1")?.image).toBeUndefined();
     expect(reply.latestScreenshot).toBeUndefined();
+  });
+
+  it("saves per-step preview screenshots and attaches their artifact ids to steps", async () => {
+    const reply = {
+      toolStepCalls: new Map([
+        ["call-1", { arguments: "{}" }],
+        ["call-2", { arguments: "{}" }],
+      ]),
+      keptResultChars: 0,
+    } as unknown as ReplyState;
+    const shot = (byte: number) => ({
+      content: [
+        { type: "text", text: "computer observed" },
+        { type: "image", data: Buffer.from([byte]).toString("base64"), mimeType: "image/png" },
+      ],
+    });
+    keepToolStepResult(reply, { ...base, name: "computer_observe", result: shot(1) }, []);
+    keepToolStepResult(
+      reply,
+      { ...base, name: "computer_observe", executionId: "call-2", result: shot(2) },
+      [],
+    );
+    let seq = 0;
+    const create = vi.fn(async ({ data }: { data: { mimeType: string } }) => ({
+      id: `preview-${++seq}`,
+      ...data,
+    }));
+    const put = vi.fn(async () => ({ id: `storage-${seq}` }));
+    const ctx = {
+      deps: {
+        prisma: { artifact: { findFirst: vi.fn(async () => null), create } },
+        artifacts: { put, remove: vi.fn() },
+      },
+      run: { spaceId: "space-1", userId: "user-1" },
+      bot: { id: "bot-1" },
+      thread: { groupId: null },
+      runId: "run-1",
+      state: { reply },
+    } as unknown as RunContext;
+    await saveStepPreviewScreenshots(ctx);
+    expect(reply.stepPreviewArtifactIds?.get("call-1")).toBe("preview-1");
+    expect(reply.stepPreviewArtifactIds?.get("call-2")).toBe("preview-2");
+    expect(create.mock.calls[0]![0].data).toMatchObject({
+      mimeType: "image/png;profile=step-preview",
+    });
+    const annotated = withToolStepOutcomes(
+      [{ kind: "steps", steps: [{ label: "Look at computer", count: 2 }] }],
+      [
+        {
+          label: "Look at computer",
+          outcome: "succeeded",
+          screenshotArtifactId: reply.stepPreviewArtifactIds?.get("call-1"),
+        },
+        {
+          label: "Look at computer",
+          outcome: "succeeded",
+          screenshotArtifactId: reply.stepPreviewArtifactIds?.get("call-2"),
+        },
+      ],
+    );
+    expect(annotated).toEqual([
+      {
+        kind: "steps",
+        steps: [
+          {
+            label: "Look at computer",
+            count: 2,
+            screenshotArtifactId: "preview-2",
+            outcomes: { succeeded: 2 },
+          },
+        ],
+      },
+    ]);
   });
 });

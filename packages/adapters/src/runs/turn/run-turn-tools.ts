@@ -41,6 +41,7 @@ import {
   keepToolStepResult,
   keptToolArguments,
   saveLatestStepScreenshot,
+  saveStepPreviewScreenshots,
 } from "./tool-step-calls.js";
 
 function showToolStep(ctx: RunContext, event: RuntimeEvent<"tool">) {
@@ -176,6 +177,7 @@ async function stopStuckToolLoop(ctx: RunContext, toolName: string, refusal?: To
   ctx.tools.approvedReplays.assertDrained();
   flushPendingTools(reply);
   await saveLatestStepScreenshot(ctx);
+  await saveStepPreviewScreenshots(ctx);
   // Calls that had not finished when the loop was stopped never ran to the end.
   reply.messageSegments = withReplyToolOutcomes(reply, "stopped");
   if (!(await renewRunLease(deps, runId, workerId, fence))) return;

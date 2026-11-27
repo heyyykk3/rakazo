@@ -1,4 +1,4 @@
-import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import { Plural, Trans } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
 import { formatCompactDuration } from "@rakazo/core";
@@ -11,6 +11,8 @@ import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Fragment, useState } from "react";
 import { toolStepCount } from "../../lib/chat/tool-activity-view";
+import type { ArtifactTarget } from "../../lib/pages/artifact-open";
+import { useArtifactImage } from "../../lib/pages/use-artifact-image";
 
 type ToolStep = Extract<ThreadMessage["blocks"][number], { kind: "steps" }>["steps"][number];
 
@@ -19,17 +21,50 @@ const EXPANDABLE_STEP_LABEL_LENGTH = 48;
 /** While a run is live, only the most recent steps are listed so a long run does not push the chat down. */
 export const LIVE_TOOL_STEP_WINDOW = 6;
 
+/** Lazy-loaded thumbnail for a computer/screen tool step, fetched only while the step is expanded. */
+function StepScreenshotPreview({
+  target,
+  artifactId,
+  label,
+}: {
+  target: ArtifactTarget | undefined;
+  artifactId: string;
+  label: string;
+}) {
+  const src = useArtifactImage(target, artifactId, Boolean(target));
+  if (!target) return null;
+  if (!src) {
+    return (
+      <div
+        className="mt-1.5 h-28 w-48 animate-pulse rounded-md border border-border/60 bg-muted/60"
+        data-testid="step-screenshot-loading"
+      />
+    );
+  }
+  return (
+    <div className="mt-1.5" data-testid="step-screenshot">
+      <img
+        src={src}
+        alt={label}
+        loading="lazy"
+        className="max-h-44 max-w-xs rounded-md border border-border/70 object-contain shadow-xs"
+      />
+    </div>
+  );
+}
+
 export function ToolSteps({
   steps,
   currentIndex,
   limit,
+  artifactTarget,
 }: {
   steps: readonly ToolStep[];
   currentIndex?: number;
   /** Show only the last `limit` steps, with a count of the earlier ones above them. */
   limit?: number;
+  artifactTarget?: ArtifactTarget;
 }) {
-  const { t } = useLingui();
   const [expandedSteps, setExpandedSteps] = useState<ReadonlySet<number>>(() => new Set());
   const hidden = limit !== undefined && steps.length > limit ? steps.length - limit : 0;
   const shown = hidden > 0 ? steps.slice(hidden) : steps;
@@ -55,16 +90,13 @@ export function ToolSteps({
           step.outcomes &&
             (step.outcomes.succeeded || step.outcomes.failed || step.outcomes.stopped),
         );
+        const hasScreenshot = Boolean(step.screenshotArtifactId);
         const expandable =
-          step.label.length > EXPANDABLE_STEP_LABEL_LENGTH || step.count > 1 || hasOutcomes;
+          step.label.length > EXPANDABLE_STEP_LABEL_LENGTH ||
+          step.count > 1 ||
+          hasOutcomes ||
+          hasScreenshot;
         const expanded = expandable && expandedSteps.has(index);
-        const outcomeParts = step.outcomes
-          ? [
-              step.outcomes.succeeded ? t`${step.outcomes.succeeded} succeeded` : null,
-              step.outcomes.failed ? t`${step.outcomes.failed} failed` : null,
-              step.outcomes.stopped ? t`${step.outcomes.stopped} stopped` : null,
-            ].filter(Boolean)
-          : [];
         return (
           <Fragment key={index}>
             {step.note ? (
@@ -127,9 +159,32 @@ export function ToolSteps({
                   </span>
                 </div>
               )}
-              {expanded && outcomeParts.length > 0 ? (
-                <div className="ps-5 pt-0.5 text-caption text-muted-foreground">
-                  {outcomeParts.join(", ")}
+              {expanded && hasOutcomes ? (
+                <div className="flex flex-wrap gap-2 ps-5 pt-0.5 text-caption text-muted-foreground">
+                  {step.outcomes?.succeeded ? (
+                    <span>
+                      <Trans>{step.outcomes.succeeded} succeeded</Trans>
+                    </span>
+                  ) : null}
+                  {step.outcomes?.failed ? (
+                    <span>
+                      <Trans>{step.outcomes.failed} failed</Trans>
+                    </span>
+                  ) : null}
+                  {step.outcomes?.stopped ? (
+                    <span>
+                      <Trans>{step.outcomes.stopped} stopped</Trans>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {expanded && step.screenshotArtifactId ? (
+                <div className="ps-5">
+                  <StepScreenshotPreview
+                    target={artifactTarget}
+                    artifactId={step.screenshotArtifactId}
+                    label={step.label}
+                  />
                 </div>
               ) : null}
             </div>
@@ -199,11 +254,13 @@ export function StandaloneToolActivity({
   steps,
   stepCount,
   durationMs,
+  artifactTarget,
 }: {
   live: boolean;
   steps: readonly ToolStep[];
   stepCount: number;
   durationMs?: number;
+  artifactTarget?: ArtifactTarget;
 }) {
   return (
     <div className="flex justify-start" dir="ltr" data-testid="tool-activity-line">
@@ -213,6 +270,7 @@ export function StandaloneToolActivity({
             steps={steps}
             currentIndex={live ? steps.length - 1 : undefined}
             limit={live ? LIVE_TOOL_STEP_WINDOW : undefined}
+            artifactTarget={artifactTarget}
           />
         </ToolActivityDisclosure>
       </div>
@@ -224,9 +282,11 @@ export function StandaloneToolActivity({
 export function ToolOnlyNarration({
   blocks,
   live,
+  artifactTarget,
 }: {
   blocks: readonly ThreadMessage["blocks"][number][];
   live: boolean;
+  artifactTarget?: ArtifactTarget;
 }) {
   return (
     <>
@@ -238,6 +298,7 @@ export function ToolOnlyNarration({
             steps={block.steps}
             stepCount={toolStepCount(block.steps)}
             durationMs={block.durationMs}
+            artifactTarget={artifactTarget}
           />
         ) : null,
       )}

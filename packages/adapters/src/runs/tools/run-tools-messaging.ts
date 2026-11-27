@@ -251,6 +251,40 @@ export const messagingTools: ToolHandlers = {
       }),
     );
   },
+  async place_call(ctx, call) {
+    const { deps, bot } = ctx;
+    if (!deps.outboundCalls) {
+      return call.finish({ error: "Outbound phone calls are not configured on this server." });
+    }
+    const to = String(call.args.to ?? "").trim();
+    if (!/^\+[1-9]\d{6,14}$/.test(to)) {
+      return call.finish({
+        error: 'Destination phone number must be in E.164 format, e.g. "+14155550100".',
+      });
+    }
+    const message = redactSecrets(String(call.args.message ?? "").trim(), ctx.secrets).slice(
+      0,
+      1_500,
+    );
+    if (!message) {
+      return call.finish({ error: "message is required" });
+    }
+    try {
+      const placed = await deps.outboundCalls.placeCall(
+        { to, message, botName: bot.name },
+        ctx.context,
+      );
+      return call.finish({
+        ok: true,
+        callId: placed.callId,
+        status: placed.status,
+        to,
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Could not place outbound call";
+      return call.finish({ error: redactSecrets(reason, ctx.secrets) });
+    }
+  },
   async end_call(ctx, call) {
     const { deps, run, bot, thread } = ctx;
     const { args } = call;

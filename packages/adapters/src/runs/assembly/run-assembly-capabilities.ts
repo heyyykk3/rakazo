@@ -731,6 +731,7 @@ export async function selectRunTools(
             select: { id: true },
           }),
         ),
+      outboundCallsEnabled: Boolean(deps.outboundCalls),
       historyRetrievalEnabled: contextStrategy !== "current" && !unknownChannelSourceId,
       historyMyChats: myChatsAllowed,
       ownPromptOnly: ownerComputerRoutine,
@@ -877,7 +878,7 @@ export async function loadComputerInstructions(
   const { heldForTakeover } = hold.takeover;
   const { bot } = parts.records;
   const { context } = parts.connected;
-  const { computerKind, computerMode, graphical, runComputer, storedComputer } = parts.computer;
+  const { computerKind, computerMode, graphical, storedComputer } = parts.computer;
   const { disabledBuiltinTools, graphicalToolsAllowed } = parts.capabilities;
   const { tools } = parts.tools;
   const baseComputerInstruction = persistentComputerInstruction({

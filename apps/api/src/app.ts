@@ -38,6 +38,7 @@ import {
   createLifecycleEmailSender,
   createMediaGenerationProvider,
   createMeetingServices,
+  createOutboundCallProvider,
   createPaymentWalletProvider,
   createPushDelivery,
   createRunReconciler,
@@ -71,7 +72,7 @@ import {
   verifyModelServesAgents,
   withHostComputerScreen,
 } from "@rakazo/adapters";
-import { createAuth, emailCopyAvailable, isBlockedAuthPath } from "@rakazo/auth";
+import { createAuth, emailCopyAvailable } from "@rakazo/auth";
 import type { ModelCredential } from "@rakazo/contracts";
 import {
   isLocalhostOrLoopbackIp,
@@ -105,14 +106,10 @@ import { mountAccountExportRoute } from "./account/account-export.js";
 import { mountAccountImportRoute } from "./account/account-import.js";
 import { mountAuditExportRoute } from "./account/audit-export.js";
 import { mountAuthCapabilities } from "./auth/auth-capabilities.js";
-import {
-  authLibraryLogger,
-  emptyAuthBodyAsJson,
-  withAuthLibraryFailures,
-} from "./auth/auth-library-failures.js";
+import { mountAuthHttpRoute } from "./auth/auth-http-route.js";
+import { authLibraryLogger } from "./auth/auth-library-failures.js";
 import { scimDirectory } from "./auth/directory-route.js";
 import { requestSessions } from "./auth/request-session.js";
-import { createAuthResponseAudit } from "./auth/security-audit.js";
 import { accountLifecycleHooks } from "./auth/session-hooks.js";
 import { isTrustedOrigin, mobileAuthOrigins } from "./auth/trusted-origins.js";
 import { mountUserDeviceRoutes } from "./auth/user-devices.js";
@@ -139,7 +136,6 @@ import {
   createClientIpResolver,
   defaultTrustedProxies,
   requestClientIp,
-  withClientIp,
 } from "./http/client-ip.js";
 import { databaseProbe, healthRoutes } from "./http/health.js";
 import { startHourlySweep } from "./http/hourly-sweep.js";
@@ -376,6 +372,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     (stripeBilling ? new StripeBillingProvider(stripeBilling) : localBillingEmulator);
   // One instance: chat runs submit videos and, in single-process mode, background polls finish them.
   const mediaGeneration = createMediaGenerationProvider();
+  const outboundCalls = createOutboundCallProvider();
   const billing = billingProvider
     ? createBillingService({
         prisma,
@@ -586,6 +583,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       cloudAgent,
       userDevices: botUserDevices,
       paymentWallet,
+      outboundCalls,
       web,
       browser,
       stoppingSignal: shutdown.signal,
@@ -808,7 +806,6 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   mountScreenTarget(app, prisma, env.screenProxySecret);
   mountScriptAssets(app);
   mountSharedPages(app, { prisma, artifacts }, requestClientIp);
-  const auditAuthResponse = createAuthResponseAudit();
   for (const [path, reason] of SYSTEM_CONTEXT_PATHS) {
     app.use(path, (_c, next) => runAsSystem(reason, next));
   }
@@ -825,18 +822,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         departure,
       ),
   });
-  app.on(["GET", "POST"], "/api/auth/*", async (c) => {
-    const path = new URL(c.req.url).pathname.replace("/api/auth", "");
-    if (isBlockedAuthPath(path)) {
-      return c.json({ error: "Not available in version 1" }, 404);
-    }
-    const ip = requestClientIp(c);
-    const response = await withAuthLibraryFailures(() =>
-      auth.handler(withClientIp(emptyAuthBodyAsJson(c.req.raw), ip)),
-    );
-    await auditAuthResponse(path, ip, response);
-    return response;
-  });
+  mountAuthHttpRoute(app, auth, requestClientIp);
   mountLocalComputerHost(app, {
     token: env.desktopStackToken,
     sandboxProvider: env.sandboxProvider,

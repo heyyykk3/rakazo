@@ -15,6 +15,7 @@ import {
   attachmentSizeLabel,
   HISTORY_ATTACHMENTS_PER_RESPONSE,
   MCP_APP_MIME_TYPE,
+  stepPreviewMimeType,
   stepScreenshotMimeType,
 } from "@rakazo/contracts";
 import {
@@ -488,6 +489,23 @@ export function storeStepScreenshot(
   return storeHiddenArtifact(deps, input, {
     name: "screenshot",
     mimeType: stepScreenshotMimeType(input.image.mimeType),
+    bytes: input.image.data,
+  });
+}
+
+/**
+ * Keeps a per-step screenshot preview as a hidden artifact so expanded tool rows in chat can load
+ * it on demand without adding it to the files library or version history.
+ */
+export function storeStepPreviewScreenshot(
+  deps: { prisma: PrismaClient; artifacts: ArtifactStore },
+  input: HiddenArtifactOwner & {
+    image: { mimeType: AttachmentImageMimeType; data: Uint8Array };
+  },
+): Promise<string> {
+  return storeHiddenArtifact(deps, input, {
+    name: "step-preview",
+    mimeType: stepPreviewMimeType(input.image.mimeType),
     bytes: input.image.data,
   });
 }

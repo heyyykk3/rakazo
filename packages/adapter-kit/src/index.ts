@@ -13,6 +13,7 @@ export * from "./meeting-calendar.js";
 export * from "./meetings.js";
 export * from "./messaging-installations.js";
 export * from "./model-errors.js";
+export * from "./outbound-calls.js";
 export * from "./paid-services.js";
 export * from "./partner-program.js";
 export * from "./payments.js";
