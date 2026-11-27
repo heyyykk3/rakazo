@@ -27,6 +27,7 @@ import { failRun, handoffEndedTurn, requeueRunAfterDatabaseOutage } from "../lif
 import { searchRunTools } from "../tools/run-tool-search.js";
 import { followUpsOffered, offeredFleetTools } from "../tools/run-tool-selection.js";
 import { applyTool } from "../tools/run-tools.js";
+import { startOpeningAcknowledgement } from "./opening-ack.js";
 import { consumeRunEvents } from "./run-turn.js";
 import { claimRunSteering } from "./run-turn-images.js";
 import { appendToolCompletionAudit, toolCompletionOutcome } from "./tool-completion-audit.js";
@@ -74,7 +75,23 @@ export async function runModelTurn(
       signal: AbortSignal.any([context.signal, ctx.runtimeAbortController.signal]),
     };
     const runtimeEvents = deps.runtime.run(baseRequest, runtimeContext);
-    if (await consumeRunEvents(ctx, runtimeEvents)) return;
+    const openingAck = startOpeningAcknowledgement(
+      services,
+      hold,
+      turn,
+      baseRequest,
+      runtimeContext,
+    );
+    let stoppedEarly = false;
+    try {
+      stoppedEarly = await consumeRunEvents(ctx, runtimeEvents, {
+        onVisibleOutput: openingAck.abort,
+      });
+    } finally {
+      openingAck.abort();
+      await openingAck.settled;
+    }
+    if (stoppedEarly) return;
     if (await interruptedByShutdown()) return;
     if (await maybeRunResultFollowUp(ctx, baseRequest, runtimeContext)) return;
     if (await interruptedByShutdown()) return;

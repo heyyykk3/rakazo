@@ -65,6 +65,8 @@ export interface ExecutorDeps {
   /** Labs features this deployment turns on for every account. */
   deploymentLabs?: readonly LabFeature[];
   phoneCallsEnabled?: boolean;
+  /** Enables the fast low-thinking opening acknowledgement and immediate pre-tool ack in chat mode. */
+  openingAcknowledgement?: boolean;
   /** Provider-neutral outbound PSTN phone call service; absent keeps `place_call` off. */
   outboundCalls?: OutboundCallProvider;
   /** The domain bot email addresses are on; absent when this server receives no email. */

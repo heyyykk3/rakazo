@@ -327,13 +327,15 @@ export async function publishMidTurnNarration(ctx: RunContext, beforeConnectCard
   // Text the redactor still holds back belongs to the text just taken out.
   reply.redactor.skip();
   const promotes = runPromotesMidTurnNarration(run.trigger);
+  const openingAck = Boolean(ctx.deps.openingAcknowledgement) && canPostOpeningAcknowledgement(ctx);
   if (
     text.length <= USER_PROGRESS_MESSAGE_MAX_LENGTH &&
-    (canPublishDurableNarration(ctx) || (beforeConnectCard && narrationBecomesMessages(ctx)))
+    (canPublishDurableNarration(ctx) ||
+      ((beforeConnectCard || openingAck) && narrationBecomesMessages(ctx)))
   ) {
     reply.workingNotes.length = 0;
     reply.narrationStatusShowing = false;
-    await publishInterimMessage(ctx, text);
+    await publishInterimMessage(ctx, text, undefined, { openingAck });
     return undefined;
   }
   reply.discardedMidTurnNarration = true;

@@ -584,6 +584,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       userDevices: botUserDevices,
       paymentWallet,
       outboundCalls,
+      openingAcknowledgement: env.agentRuntime !== "scripted",
       web,
       browser,
       stoppingSignal: shutdown.signal,

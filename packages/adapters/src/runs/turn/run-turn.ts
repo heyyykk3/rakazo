@@ -48,6 +48,7 @@ export type RuntimeEvent<T extends AgentRuntimeEvent["type"]> = Extract<
 export async function consumeRunEvents(
   ctx: RunContext,
   events: AsyncIterable<AgentRuntimeEvent>,
+  options?: { onVisibleOutput?: () => void },
 ): Promise<boolean> {
   const { deps, run, runId, bot } = ctx;
   const { reply } = ctx.state;
@@ -118,6 +119,7 @@ export async function consumeRunEvents(
         reply.assistantTurnText = "";
       }
       if (event.type === "text") {
+        if (event.text.trim().length > 0) options?.onVisibleOutput?.();
         await streamText(ctx, event);
       } else if (event.type === "turn") {
         reply.assistantTurnBreakPending = true;
@@ -126,14 +128,18 @@ export async function consumeRunEvents(
       } else if (event.type === "progress") {
         await streamProgress(ctx, event);
       } else if (event.type === "ask") {
+        options?.onVisibleOutput?.();
         await pauseForAnswer(ctx, event);
         return true;
       } else if (event.type === "takeover") {
+        options?.onVisibleOutput?.();
         await pauseForTakeover(ctx, event);
         return true;
       } else if (event.type === "tool") {
+        if (event.name === "message_user") options?.onVisibleOutput?.();
         if (await onToolCalled(ctx, event)) return true;
       } else if (event.type === "yielded") {
+        options?.onVisibleOutput?.();
         const ended = await handBackBetweenSteps(ctx, event.checkpoint);
         event.answer(ended);
         if (ended) return true;

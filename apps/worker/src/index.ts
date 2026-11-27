@@ -263,6 +263,7 @@ async function main() {
     ),
     paymentWallet,
     outboundCalls,
+    openingAcknowledgement: true,
     stoppingSignal: shutdown.signal,
     shutdownSignal: runDrain.signal,
   });
